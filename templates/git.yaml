@@ -1,0 +1,45 @@
+# Connector template pack: git（新手示例）
+#
+# 把本机 `git` 常用只读命令预置为 MCP tools，无需在 cli-to-mcp.yaml 里手写 tools。
+# 匹配规则：connector.name 为 git，或 discovery.template: git
+
+id: git
+connectorNames:
+  - git
+
+tools:
+  git_status:
+    enabled: true
+    connector: git
+    command: ["status"]
+    description: Show working tree status (porcelain, with branch info).
+    default_args: ["--porcelain", "-b"]
+    output:
+      format: text
+
+  git_log:
+    enabled: true
+    connector: git
+    command: ["log"]
+    description: Show recent commits (oneline, last 15).
+    default_args: ["--oneline", "-n", "15"]
+    output:
+      format: text
+
+  git_diff_stat:
+    enabled: true
+    connector: git
+    command: ["diff"]
+    description: Show diff stat for unstaged/staged changes (summary only).
+    default_args: ["--stat"]
+    output:
+      format: text
+
+  git_branch:
+    enabled: true
+    connector: git
+    command: ["branch"]
+    description: List local branches (current branch marked with *).
+    default_args: ["-v"]
+    output:
+      format: text
