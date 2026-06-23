@@ -1,0 +1,18 @@
+# 新手示例：只接 Git，不配 GitHub CLI
+version: 1
+
+connectors:
+  - name: git
+    binary: git
+    enabled: true
+    default_timeout_seconds: 30
+    working_dir: null
+    discovery:
+      mode: help
+      parser: generic
+      max_depth: 2
+    skills:
+      - ./skills/git.md
+
+# 不写 tools: 时，会自动加载 templates/git.yaml 里的 4 个模板工具。
+# 需要覆盖某个工具时，在这里写同名 tools.<name> 即可（yaml 优先于 template）。

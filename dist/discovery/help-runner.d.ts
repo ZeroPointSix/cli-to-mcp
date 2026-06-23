@@ -4,7 +4,7 @@ export type RunHelpOptions = {
     cwd?: string;
     /** Hard timeout for the help spawn. */
     timeoutMs?: number;
-    /** Extra argv inserted between binary and subcommand path. */
+    /** Inserted after binary, before subcommand path (connector argv_prefix). */
     argvPrefix?: string[];
 };
 export type HelpOutput = {

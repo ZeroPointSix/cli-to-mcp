@@ -1,0 +1,10 @@
+View a pull request.
+
+USAGE
+  gh pr view [<number> | <url> | <branch>] [flags]
+
+FLAGS
+  --number integer   The number of the pull request
+  --json fields      Output JSON with the specified fields
+  --comments         Display comments for the pull request
+  -h, --help         Show help for command

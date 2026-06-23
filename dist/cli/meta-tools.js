@@ -13,8 +13,8 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { exec } from "node:child_process";
 import { resolve, relative } from "node:path";
-import { buildDiscoveryEngine } from "../discovery/engine-factory.js";
 import { summarizeSources } from "../discovery/sources.js";
+import { buildDiscoveryEngine } from "../discovery/engine-factory.js";
 const META_DEFS = [
     { name: "list_connectors", description: "List registered CLI connectors." },
     { name: "doctor", description: "Check CLI binary, version, and cache state." },
@@ -300,3 +300,4 @@ export function resolvePathUnderSkillRoot(skillRoot, relativePath) {
     }
     return { ok: true, abs };
 }
+//# sourceMappingURL=meta-tools.js.map

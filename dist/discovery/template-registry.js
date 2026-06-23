@@ -88,3 +88,4 @@ export function loadBuiltinPacks(dir) {
     }
     return reg;
 }
+//# sourceMappingURL=template-registry.js.map

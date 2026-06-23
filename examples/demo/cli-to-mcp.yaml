@@ -1,0 +1,49 @@
+# 演示：GitHub CLI (gh) + Git 同一 MCP 服务（端口 28989）
+version: 1
+
+connectors:
+  - name: gh
+    binary: gh
+    enabled: true
+    default_timeout_seconds: 30
+    discovery:
+      mode: help
+      parser: cobra
+      max_depth: 3
+    skills:
+      - ../gh/skills/gh.md
+
+  - name: git
+    binary: git
+    enabled: true
+    default_timeout_seconds: 30
+    discovery:
+      mode: help
+      parser: generic
+      max_depth: 2
+    skills:
+      - ../git/skills/git.md
+
+tools:
+  # gh 示例里常用的 4 个显式 yaml 工具（与 examples/gh 一致，便于 JSON 输出）
+  gh_pr_view:
+    enabled: true
+    connector: gh
+    command: ["pr", "view"]
+    description: View a GitHub pull request by number, URL, or branch.
+    args:
+      number:
+        type: integer
+        required: false
+    default_args: ["--json", "number,title,state,author,body,url"]
+    output:
+      format: json
+
+  gh_pr_list:
+    enabled: true
+    connector: gh
+    command: ["pr", "list"]
+    description: List pull requests in the current repository.
+    default_args: ["--json", "number,title,state,author,url", "-L", "30"]
+    output:
+      format: json

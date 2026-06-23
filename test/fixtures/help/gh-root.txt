@@ -1,0 +1,17 @@
+Work seamlessly with GitHub from the command line.
+
+USAGE
+  gh <command> <subcommand> [flags]
+
+CORE COMMANDS
+  auth:        Authenticate gh and git with GitHub
+  pr:          Manage pull requests
+  issue:       Manage issues
+  repo:        Manage repositories
+
+FLAGS
+  --help      Show help for command
+  --version   Show gh version
+
+INHERITED FLAGS
+  --json fields   Output JSON with the specified fields

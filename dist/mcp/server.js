@@ -189,3 +189,4 @@ function toCallToolResult(payload) {
             payload.ok === false,
     };
 }
+//# sourceMappingURL=server.js.map

@@ -1,7 +1,7 @@
-import { type LoadedConfig } from "../config/config-loader.js";
+import type { LoadedConfig } from "../config/config-loader.js";
 import { DiscoveryEngine } from "./discovery-engine.js";
-import { HelpParserRegistry } from "./parser-registry.js";
-import { runHelp } from "./help-runner.js";
+import type { HelpParserRegistry } from "./parser-registry.js";
+import type { runHelp } from "./help-runner.js";
 export type BuildDiscoveryEngineOptions = {
     parserRegistry?: HelpParserRegistry;
     log?: (msg: string) => void;

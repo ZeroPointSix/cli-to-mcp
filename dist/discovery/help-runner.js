@@ -8,15 +8,13 @@
  */
 import { spawn } from "node:child_process";
 import { stripAnsi } from "./plugins/generic.js";
-import { prepareSpawnCommand } from "../executor/spawn-command.js";
 export async function runHelp(binary, path, opts = {}) {
     const argv = [binary, ...(opts.argvPrefix ?? []), ...path, "--help"];
     const env = { ...(opts.env ?? process.env) };
     return new Promise((resolve) => {
         let child;
         try {
-            const spawnCmd = prepareSpawnCommand(argv);
-            child = spawn(spawnCmd.command, spawnCmd.args, {
+            child = spawn(argv[0], argv.slice(1), {
                 env,
                 cwd: opts.cwd,
                 stdio: ["ignore", "pipe", "pipe"],
@@ -72,3 +70,4 @@ export async function runHelp(binary, path, opts = {}) {
         });
     });
 }
+//# sourceMappingURL=help-runner.js.map

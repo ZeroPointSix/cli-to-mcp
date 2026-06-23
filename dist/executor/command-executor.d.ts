@@ -27,7 +27,7 @@ export declare class CommandExecutor {
     execute(req: ExecuteRequest): Promise<RawExecutionResult>;
 }
 /**
- * Build the full argv: [binary, ...argvPrefix, ...subcommandPath, ...userArgs, ...defaultArgs].
+ * Build the full argv: [binary, ...subcommandPath, ...userArgs, ...defaultArgs].
  * User args are emitted as --name value pairs (booleans emit --name only).
  * Repeatable (array) args emit the flag multiple times.
  */

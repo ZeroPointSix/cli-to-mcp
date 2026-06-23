@@ -157,3 +157,4 @@ export function flagFor(name) {
         return trimmed;
     return core.length === 1 ? `-${core}` : `--${core}`;
 }
+//# sourceMappingURL=command-executor.js.map

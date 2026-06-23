@@ -1,0 +1,14 @@
+A simple CLI tool.
+
+Usage: demo [command] [flags]
+
+Commands:
+  run       Run a task
+  list      List items
+  status    Show status
+
+Options:
+  --name <string>   Name to use
+  --count <int>     Number of items
+  --verbose         Verbose output
+  -h, --help        Show help

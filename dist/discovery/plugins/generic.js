@@ -135,3 +135,4 @@ function inferType(name, desc) {
     }
     return "string";
 }
+//# sourceMappingURL=generic.js.map

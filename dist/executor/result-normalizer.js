@@ -46,3 +46,4 @@ function looksLikeJson(s) {
     const first = s[0];
     return first === "{" || first === "[" || first === '"';
 }
+//# sourceMappingURL=result-normalizer.js.map

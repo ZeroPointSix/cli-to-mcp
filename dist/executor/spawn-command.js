@@ -1,19 +1,28 @@
+/**
+ * Windows-safe spawn preparation: on win32, run via cmd.exe /d /s /c with quoted argv.
+ * Unix: spawn argv[0] with argv.slice(1) directly (shell:false).
+ */
 export function prepareSpawnCommand(argv, platform = process.platform, env = process.env) {
     if (argv.length === 0)
         throw new Error("cannot spawn an empty argv");
     if (platform === "win32") {
-        return {
-            command: env.ComSpec || "cmd.exe",
-            args: ["/d", "/s", "/c", quoteWindowsCommand(argv)],
-        };
+        const bin = argv[0];
+        const lower = bin.toLowerCase();
+        const needsCmdShim = (!bin.includes("\\") && !bin.includes("/")) ||
+            lower.endsWith(".cmd") ||
+            lower.endsWith(".bat");
+        if (needsCmdShim) {
+            return {
+                command: env.ComSpec || "cmd.exe",
+                args: ["/d", "/s", "/c", quoteWindowsCommand(argv)],
+            };
+        }
     }
     return { command: argv[0], args: argv.slice(1) };
 }
-
 export function quoteWindowsCommand(argv) {
     return argv.map(quoteWindowsArg).join(" ");
 }
-
 function quoteWindowsArg(value) {
     const raw = String(value);
     if (raw.length === 0)
@@ -21,3 +30,4 @@ function quoteWindowsArg(value) {
     const escaped = raw.replace(/["^&|<>()%!]/g, (ch) => `^${ch}`);
     return `"${escaped}"`;
 }
+//# sourceMappingURL=spawn-command.js.map

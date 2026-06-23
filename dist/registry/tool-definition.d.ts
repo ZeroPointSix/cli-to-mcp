@@ -46,7 +46,7 @@ export type ToolDefinition = {
     connectorName: string;
     /** Binary on PATH, e.g. "gh" / "lark-cli". Executor spawns this directly. */
     binary: string;
-    /** Extra argv inserted between binary and subcommand path, e.g. ["-m", "azure.cli"]. */
+    /** Tokens between binary and command path (from connector argv_prefix). */
     argvPrefix?: string[];
     /** Subcommand path appended after the binary, e.g. ["pr","view"]. */
     command: string[];

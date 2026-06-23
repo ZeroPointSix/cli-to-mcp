@@ -30,6 +30,7 @@ export const DiscoveryConfig = z.object({
 export const ConnectorConfig = z.object({
     name: z.string().min(1),
     binary: z.string().min(1),
+    /** Inserted after binary in argv (e.g. python -m module). */
     argv_prefix: z.array(z.string()).optional(),
     enabled: z.boolean().default(true),
     default_timeout_seconds: z.number().positive().optional(),
@@ -72,3 +73,4 @@ export function validateConfig(raw) {
     }
     return result.data;
 }
+//# sourceMappingURL=schema.js.map

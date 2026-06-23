@@ -1,8 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { DiscoveryEngine } from "./discovery-engine.js";
-import { YamlSource, TemplateSource, HelpSource, createDefaultParserRegistry } from "./sources.js";
+import { YamlSource, TemplateSource, HelpSource, createDefaultParserRegistry, } from "./sources.js";
 import { loadBuiltinPacks } from "./template-registry.js";
-
 export async function buildDiscoveryEngine(config, opts = {}) {
     const parserRegistry = opts.parserRegistry ?? createDefaultParserRegistry();
     await loadParserModules(config, parserRegistry, opts.log);
@@ -10,12 +9,15 @@ export async function buildDiscoveryEngine(config, opts = {}) {
         engine: new DiscoveryEngine([
             new YamlSource(),
             new TemplateSource(loadBuiltinPacks()),
-            new HelpSource({ parserRegistry, log: opts.log, runHelpFn: opts.runHelpFn }),
+            new HelpSource({
+                parserRegistry,
+                log: opts.log,
+                runHelpFn: opts.runHelpFn,
+            }),
         ]),
         parserRegistry,
     };
 }
-
 export async function loadParserModules(config, registry, log = () => { }) {
     const seenModules = new Set();
     for (const connector of config.connectors) {
@@ -25,7 +27,7 @@ export async function loadParserModules(config, registry, log = () => { }) {
         if (!modulePath || seenModules.has(modulePath))
             continue;
         seenModules.add(modulePath);
-        const mod = await import(pathToFileURL(modulePath).href);
+        const mod = (await import(pathToFileURL(modulePath).href));
         const plugins = parserPluginsFromModule(mod);
         if (plugins.length === 0) {
             throw new Error(`parser_module did not export a HelpParserPlugin: ${modulePath}`);
@@ -40,7 +42,6 @@ export async function loadParserModules(config, registry, log = () => { }) {
         }
     }
 }
-
 function parserPluginsFromModule(mod) {
     const candidates = [];
     if (Array.isArray(mod.plugins))
@@ -52,12 +53,12 @@ function parserPluginsFromModule(mod) {
         return isParserPlugin(candidate) ? [candidate] : [];
     });
 }
-
 function isParserPlugin(candidate) {
-    return !!candidate &&
+    return (!!candidate &&
         typeof candidate === "object" &&
         typeof candidate.id === "string" &&
         typeof candidate.displayName === "string" &&
         typeof candidate.match === "function" &&
-        typeof candidate.parse === "function";
+        typeof candidate.parse === "function");
 }
+//# sourceMappingURL=engine-factory.js.map

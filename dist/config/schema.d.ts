@@ -64,6 +64,7 @@ export type DiscoveryConfig = z.infer<typeof DiscoveryConfig>;
 export declare const ConnectorConfig: z.ZodObject<{
     name: z.ZodString;
     binary: z.ZodString;
+    /** Inserted after binary in argv (e.g. python -m module). */
     argv_prefix: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     enabled: z.ZodDefault<z.ZodBoolean>;
     default_timeout_seconds: z.ZodOptional<z.ZodNumber>;
@@ -99,8 +100,8 @@ export declare const ConnectorConfig: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     name: string;
     binary: string;
-    argv_prefix?: string[] | undefined;
     enabled: boolean;
+    argv_prefix?: string[] | undefined;
     default_timeout_seconds?: number | undefined;
     working_dir?: string | null | undefined;
     env?: Record<string, string> | undefined;
@@ -218,6 +219,8 @@ export declare const Config: z.ZodObject<{
     connectors: z.ZodArray<z.ZodObject<{
         name: z.ZodString;
         binary: z.ZodString;
+        /** Inserted after binary in argv (e.g. python -m module). */
+        argv_prefix: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         enabled: z.ZodDefault<z.ZodBoolean>;
         default_timeout_seconds: z.ZodOptional<z.ZodNumber>;
         working_dir: z.ZodOptional<z.ZodNullable<z.ZodString>>;
@@ -253,6 +256,7 @@ export declare const Config: z.ZodObject<{
         name: string;
         binary: string;
         enabled: boolean;
+        argv_prefix?: string[] | undefined;
         default_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
         env?: Record<string, string> | undefined;
@@ -269,6 +273,7 @@ export declare const Config: z.ZodObject<{
     }, {
         name: string;
         binary: string;
+        argv_prefix?: string[] | undefined;
         enabled?: boolean | undefined;
         default_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
@@ -369,6 +374,7 @@ export declare const Config: z.ZodObject<{
         name: string;
         binary: string;
         enabled: boolean;
+        argv_prefix?: string[] | undefined;
         default_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
         env?: Record<string, string> | undefined;
@@ -409,6 +415,7 @@ export declare const Config: z.ZodObject<{
     connectors: {
         name: string;
         binary: string;
+        argv_prefix?: string[] | undefined;
         enabled?: boolean | undefined;
         default_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;

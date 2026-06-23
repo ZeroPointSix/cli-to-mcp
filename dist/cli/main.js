@@ -44,3 +44,4 @@ main().catch((err) => {
     process.stderr.write(`cli-to-mcp: ${String(err)}\n`);
     process.exit(1);
 });
+//# sourceMappingURL=main.js.map

@@ -40,6 +40,7 @@ export declare class CacheStore {
     /** Run `fn` inside a transaction. Rolls back on throw. */
     private tx;
     private migrate;
+    /** Upgrade legacy tools(name) PK to (config_hash, name) for per-hash isolation. */
     private migrateToolsPrimaryKey;
     upsertConnector(c: Omit<ConnectorRow, "created_at" | "updated_at">): void;
     getConnector(name: string): ConnectorRow | undefined;

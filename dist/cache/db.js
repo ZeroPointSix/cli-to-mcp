@@ -98,11 +98,14 @@ export class CacheStore {
       CREATE INDEX IF NOT EXISTS idx_tools_hash ON tools(config_hash);
     `);
     }
+    /** Upgrade legacy tools(name) PK to (config_hash, name) for per-hash isolation. */
     migrateToolsPrimaryKey() {
         const columns = this.db.prepare(`PRAGMA table_info(tools)`).all();
-        const name = columns.find((c) => c.name === "name");
-        const configHash = columns.find((c) => c.name === "config_hash");
-        if (name?.pk === 2 && configHash?.pk === 1)
+        const nameCol = columns.find((c) => c.name === "name");
+        const hashCol = columns.find((c) => c.name === "config_hash");
+        if (nameCol?.pk === 2 && hashCol?.pk === 1)
+            return;
+        if (columns.length === 0)
             return;
         this.tx(() => {
             this.db.exec(`
@@ -216,14 +219,11 @@ export class CacheStore {
             .get();
         if (!latest)
             return [];
-        const rows = this.db
-            .prepare(`SELECT definition_json FROM tools WHERE config_hash = ? ORDER BY name`)
-            .all(latest.config_hash);
-        return rows.map((r) => JSON.parse(r.definition_json));
+        return this.loadTools(latest.config_hash);
     }
     getTool(name) {
         const row = this.db
-            .prepare(`SELECT definition_json FROM tools WHERE name = ? ORDER BY updated_at DESC LIMIT 1`)
+            .prepare(`SELECT definition_json FROM tools WHERE name = ?`)
             .get(name);
         return row ? JSON.parse(row.definition_json) : undefined;
     }
@@ -234,3 +234,4 @@ export class CacheStore {
         return !!row;
     }
 }
+//# sourceMappingURL=db.js.map
