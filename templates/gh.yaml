@@ -1,0 +1,102 @@
+# Connector template pack: gh
+#
+# Consumed by TemplateSource (src/discovery/template-registry.ts). A pack is a
+# fragment of cli-to-mcp.yaml's `tools:` section plus metadata describing which
+# connector names it matches. Users do NOT need to copy this file — it is read
+# automatically when a connector named "gh" is declared, or when a connector
+# sets `discovery.template: gh`.
+#
+# Merge priority (ADR 0003): user YAML > template > help. So every field here
+# can be overridden by an explicit `tools:` entry of the same name.
+
+id: gh
+connectorNames:
+  - gh
+
+tools:
+  gh_pr_view:
+    enabled: true
+    connector: gh
+    command: ["pr", "view"]
+    description: View a GitHub pull request by number, URL, or branch.
+    args:
+      number:
+        type: integer
+        required: false
+        description: Pull request number. If omitted, uses the PR for the current branch.
+      json:
+        type: string
+        required: false
+        default: "number,title,state,author,body,url"
+        description: Comma-separated fields to output as JSON.
+    default_args: ["--json", "number,title,state,author,body,url"]
+    output:
+      format: json
+
+  gh_pr_list:
+    enabled: true
+    connector: gh
+    command: ["pr", "list"]
+    description: List pull requests in the current repository.
+    args:
+      limit:
+        type: integer
+        required: false
+        default: 30
+        description: Maximum number of PRs to return.
+      state:
+        type: string
+        required: false
+        default: open
+        enum: ["open", "closed", "merged", "all"]
+        description: Filter PRs by state.
+      json:
+        type: string
+        required: false
+        default: "number,title,state,author,url"
+    default_args: ["--json", "number,title,state,author,url"]
+    output:
+      format: json
+
+  gh_repo_view:
+    enabled: true
+    connector: gh
+    command: ["repo", "view"]
+    description: View a GitHub repository (current repo by default, or OWNER/REPO).
+    args:
+      repo:
+        type: string
+        required: false
+        description: Repository to view, e.g. OWNER/REPO. Omit for the current repo.
+      json:
+        type: string
+        required: false
+        default: "nameWithOwner,description,url,stargazerCount"
+    default_args: ["--json", "nameWithOwner,description,url,stargazerCount"]
+    output:
+      format: json
+
+  gh_issue_list:
+    enabled: true
+    connector: gh
+    command: ["issue", "list"]
+    description: List issues in the current repository.
+    args:
+      limit:
+        type: integer
+        required: false
+        default: 30
+        description: Maximum number of issues to return.
+      state:
+        type: string
+        required: false
+        default: open
+        enum: ["open", "closed", "all"]
+        description: Filter issues by state.
+      json:
+        type: string
+        required: false
+        default: "number,title,state,author,url"
+    default_args: ["--json", "number,title,state,author,url"]
+    output:
+      format: json
