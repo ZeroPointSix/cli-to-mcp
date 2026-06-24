@@ -39,7 +39,6 @@ export function startBackgroundDiscovery(opts: {
   const targets = opts.config.connectors.filter((c) => c.enabled && shouldBackgroundContinue(c));
   if (targets.length === 0) return null;
 
-  let aborted = false;
   const startedAt = new Date().toISOString();
   const status: BackgroundDiscoveryStatus = {
     running: true,
@@ -57,7 +56,6 @@ export function startBackgroundDiscovery(opts: {
     try {
       const results = await Promise.all(
         targets.map(async (conn) => {
-          if (aborted) return { name: conn.name, discovered: [] as ToolDefinition[] };
           const unbounded = connectorWithoutStartupBudget(conn);
           opts.log(`background discovery: scanning ${conn.name}`);
           try {
@@ -75,13 +73,18 @@ export function startBackgroundDiscovery(opts: {
           }
         }),
       );
-      if (!aborted) {
-        const byConnector = snapshotRegistryByConnector(opts.registry);
-        for (const r of results) {
-          if (r.discovered.length > 0) byConnector.set(r.name, r.discovered);
+      const byConnector = snapshotRegistryByConnector(opts.registry);
+      let mergedAny = false;
+      for (const r of results) {
+        if (r.discovered.length > 0) {
+          byConnector.set(r.name, r.discovered);
+          mergedAny = true;
         }
+      }
+      if (mergedAny) {
         const size = applyMergedTools(opts.config, opts.registry, opts.cache, byConnector);
         status.last_registry_size = size;
+        opts.log(`background discovery: merged registry_size=${size}`);
       }
     } catch (err) {
       status.last_error = String(err);
@@ -99,7 +102,7 @@ export function startBackgroundDiscovery(opts: {
     status: () => ({ ...status }),
     done,
     abort: () => {
-      aborted = true;
+      /* merge always applies completed discover results; stop() awaits done first */
     },
   };
 }

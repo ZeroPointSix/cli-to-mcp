@@ -134,8 +134,15 @@ export async function startRuntime(opts: ServeOptions): Promise<Runtime> {
     backgroundDiscovery,
     backgroundDiscoveryStatus: () => backgroundDiscovery?.status() ?? null,
     async stop() {
-      backgroundDiscovery?.abort();
-      await backgroundDiscovery?.done.catch(() => {});
+      const bg = backgroundDiscovery;
+      if (bg) {
+        await Promise.race([
+          bg.done,
+          new Promise((r) => setTimeout(r, 30_000)),
+        ]);
+        bg.abort();
+        await bg.done.catch(() => {});
+      }
       await server.stop();
       cache.close();
     },

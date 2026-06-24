@@ -115,6 +115,8 @@ if (rt.backgroundDiscovery) {
     await Promise.race([rt.backgroundDiscovery.done, bgTimeout]);
   } catch (e) {
     console.error(String(e));
+    console.error("waiting up to 120s for in-flight discovery to finish and merge...");
+    await Promise.race([rt.backgroundDiscovery.done, new Promise((r) => setTimeout(r, 120_000))]);
   } finally {
     clearInterval(poll);
   }
