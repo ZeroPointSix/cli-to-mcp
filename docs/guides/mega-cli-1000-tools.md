@@ -67,6 +67,15 @@ BENCH_BG_MAX_MS=7200000 node scripts/bench-until-1000.mjs --az-only --keep-cache
 
 **第二次**用同一 `--keep-cache` 目录：`help_cache` 命中后，后台阶段会快很多；若 `tools` 已在 SQLite 满 configHash，则直接秒启。
 
+若后台已扫完 help（日志里 `leaf_tools=3000+`）但 `registry` 仍只有冷启数量（旧版本或 bench 超时），**不必重跑 2h help**：
+
+```bash
+node scripts/rebuild-tools-from-cache.mjs --cache-dir ./.bench-az-1k
+# 约 1～2s，从 help_cache 重建 tools 表；再 serve 同一 cache 即 3000+ 工具
+```
+
+`bench-until-1000.mjs --keep-cache` 在 FAIL 时会自动尝试 phase 3 rebuild。
+
 ---
 
 ## 日常 serve（生产）

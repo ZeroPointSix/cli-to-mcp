@@ -139,6 +139,21 @@ console.log(`tools_final: ${finalTotal} by_connector=${JSON.stringify(finalBy)}`
 console.log(`goal >=${GOAL}: ${hit1k ? "PASS" : "FAIL"} (gap=${GOAL - finalTotal})`);
 console.log(`cache: ${cachePath}`);
 
+if (!hit1k && keepDir && existsSync(cachePath)) {
+  console.log(
+    `\n--- phase 3 (optional): rebuild tools from help_cache only (no re-spawn) ---`,
+  );
+  const { spawnSync } = await import("node:child_process");
+  const rb = spawnSync(process.execPath, ["scripts/rebuild-tools-from-cache.mjs", "--cache-dir", baseDir], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: "inherit",
+  });
+  if (rb.status === 0) {
+    console.log("rebuild-tools-from-cache: PASS — restart serve with same --cache for instant 1000+ registry");
+  }
+}
+
 if (!keepDir) {
   try {
     rmSync(baseDir, { recursive: true, force: true });
