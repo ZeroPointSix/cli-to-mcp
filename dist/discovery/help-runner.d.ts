@@ -6,6 +6,7 @@ export type RunHelpOptions = {
     timeoutMs?: number;
     /** Inserted after binary, before subcommand path (connector argv_prefix). */
     argvPrefix?: string[];
+    helpArgv?: string[];
 };
 export type HelpOutput = {
     rawHelp: string;

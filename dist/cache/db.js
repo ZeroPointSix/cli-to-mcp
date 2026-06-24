@@ -91,6 +91,16 @@ export class CacheStore {
 
       CREATE INDEX IF NOT EXISTS idx_commands_connector ON commands(connector_name);
       CREATE INDEX IF NOT EXISTS idx_scanruns_connector ON scan_runs(connector_name);
+
+      CREATE TABLE IF NOT EXISTS help_cache (
+        connector_name TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        path_key TEXT NOT NULL,
+        raw_help TEXT NOT NULL,
+        exit_code INTEGER,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (connector_name, fingerprint, path_key)
+      );
     `);
         this.migrateToolsPrimaryKey();
         this.db.exec(`
@@ -182,6 +192,57 @@ export class CacheStore {
         return this.db
             .prepare(`SELECT * FROM commands WHERE connector_name = ? ORDER BY id`)
             .all(connectorName);
+    }
+    // ---- help_cache (per-path raw help for faster re-discovery) ----
+    getHelpCache(key) {
+        const row = this.db
+            .prepare(`SELECT raw_help, exit_code FROM help_cache
+         WHERE connector_name = ? AND fingerprint = ? AND path_key = ?`)
+            .get(key.connector_name, key.fingerprint, key.path_key);
+        return row;
+    }
+    putHelpCache(key) {
+        const now = new Date().toISOString();
+        this.db
+            .prepare(`INSERT INTO help_cache (connector_name, fingerprint, path_key, raw_help, exit_code, updated_at)
+         VALUES (@connector_name, @fingerprint, @path_key, @raw_help, @exit_code, @updated_at)
+         ON CONFLICT(connector_name, fingerprint, path_key) DO UPDATE SET
+           raw_help = excluded.raw_help,
+           exit_code = excluded.exit_code,
+           updated_at = excluded.updated_at`)
+            .run({ ...key, updated_at: now });
+    }
+    countHelpCache(connectorName, fingerprint) {
+        const row = this.db
+            .prepare(`SELECT COUNT(*) AS c FROM help_cache WHERE connector_name = ? AND fingerprint = ?`)
+            .get(connectorName, fingerprint);
+        return Number(row.c);
+    }
+    /** Load all cached help pages for a connector fingerprint (one query per scan). */
+    loadHelpCacheMap(connectorName, fingerprint) {
+        const rows = this.db
+            .prepare(`SELECT path_key, raw_help, exit_code FROM help_cache
+         WHERE connector_name = ? AND fingerprint = ?`)
+            .all(connectorName, fingerprint);
+        const map = new Map();
+        for (const r of rows)
+            map.set(r.path_key, { raw_help: r.raw_help, exit_code: r.exit_code });
+        return map;
+    }
+    putHelpCacheBatch(rows) {
+        if (rows.length === 0)
+            return;
+        const now = new Date().toISOString();
+        const ins = this.db.prepare(`INSERT INTO help_cache (connector_name, fingerprint, path_key, raw_help, exit_code, updated_at)
+       VALUES (@connector_name, @fingerprint, @path_key, @raw_help, @exit_code, @updated_at)
+       ON CONFLICT(connector_name, fingerprint, path_key) DO UPDATE SET
+         raw_help = excluded.raw_help,
+         exit_code = excluded.exit_code,
+         updated_at = excluded.updated_at`);
+        this.tx(() => {
+            for (const r of rows)
+                ins.run({ ...r, updated_at: now });
+        });
     }
     // ---- tools ----
     /**

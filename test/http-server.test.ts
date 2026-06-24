@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { startRuntime, type Runtime } from "../src/cli/runtime.js";
+
+const MOCK_CLI = fileURLToPath(new URL("./fixtures/mock-cli.js", import.meta.url));
+const NODE = process.execPath.replace(/\\/g, "/");
 
 let dir: string;
 let runtime: Runtime;
@@ -120,14 +124,14 @@ tools:
 version: 1
 connectors:
   - name: mock
-    binary: node
+    binary: ${JSON.stringify(NODE)}
     enabled: true
     default_timeout_seconds: 5
 tools:
   mock_echo:
     enabled: true
     connector: mock
-    command: ["-e", "console.log(JSON.stringify({hello:'world'}))"]
+    command: [${JSON.stringify(MOCK_CLI.replace(/\\/g, "/"))}]
     description: Echo test
     output:
       format: json
@@ -144,7 +148,7 @@ tools:
     const payload = JSON.parse(call.body.result.content[0].text);
     expect(payload.ok).toBe(true);
     expect(payload.exit_code).toBe(0);
-    expect(payload.parsed_output).toEqual({ hello: "world" });
+    expect(payload.parsed_output).toEqual({ args: [] });
   });
 
   it("second initialize without session id succeeds (new session)", async () => {
@@ -215,6 +219,8 @@ connectors:
     binary: gh
     enabled: true
     default_timeout_seconds: 10
+    discovery:
+      mode: manual
 tools: {}
 `);
     runtime = await startRuntime({
@@ -229,6 +235,64 @@ tools: {}
     const payload = JSON.parse(call.body.result.content[0].text);
     expect(payload.ok).toBe(true);
     expect(payload.connectors[0].name).toBe("gh");
+  });
+
+  it("exposure_mode lazy hides connector CLI tools but keeps meta tools in tools/list", async () => {
+    port = 18794;
+    const cfgPath = writeConfig(`
+version: 1
+connectors:
+  - name: mock
+    binary: node
+    enabled: true
+    default_timeout_seconds: 5
+  - name: lazyconn
+    binary: node
+    enabled: true
+    default_timeout_seconds: 5
+    discovery:
+      mode: none
+      exposure_mode: lazy
+tools:
+  mock_echo:
+    enabled: true
+    connector: mock
+    command: ["-e", "console.log('flat')"]
+    description: flat connector tool
+  lazy_static:
+    enabled: true
+    connector: lazyconn
+    command: ["-e", "console.log('lazy')"]
+    description: lazy connector yaml tool
+`);
+    runtime = await startRuntime({
+      host: "127.0.0.1",
+      port,
+      config: cfgPath,
+      cachePath: join(dir, "cache.sqlite"),
+      log: () => {},
+    });
+
+    const sid = await handshake();
+    const list = await mcpRequest("tools/list", {}, 2, sid);
+    const names = list.body.result.tools.map((t: any) => t.name);
+
+    expect(names).toContain("mock_echo");
+    expect(names).not.toContain("lazy_static");
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "list_connectors",
+        "doctor",
+        "refresh_tools",
+        "get_skills",
+        "get_tool_source",
+        "list_tool_categories",
+        "list_tools_by_category",
+        "search_tools",
+        "get_tool_schema",
+        "call_tool",
+      ]),
+    );
   });
 
   it("host/port/config flags take effect (binds to requested port)", async () => {

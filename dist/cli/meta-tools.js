@@ -11,16 +11,29 @@
  * reserved names (META_TOOL_NAMES) so user tools can never shadow them.
  */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { exec } from "node:child_process";
 import { resolve, relative } from "node:path";
 import { summarizeSources } from "../discovery/sources.js";
 import { buildDiscoveryEngine } from "../discovery/engine-factory.js";
+import { getToolSchema, listToolCategories, listToolsByCategory, searchTools, } from "./tool-explorer.js";
+import { executeDynamicTool } from "./execute-dynamic-tool.js";
+import { buildMetaToolListEntries } from "./meta-tool-schemas.js";
+import { normalizeRegistryToolName } from "./normalize-meta-args.js";
+import { probeConnectorBinary } from "../executor/binary-probe.js";
+import { applyMergedTools, discoverOneConnector, snapshotRegistryByConnector, } from "./discovery-runner.js";
 const META_DEFS = [
     { name: "list_connectors", description: "List registered CLI connectors." },
     { name: "doctor", description: "Check CLI binary, version, and cache state." },
     { name: "refresh_tools", description: "Re-run discovery and refresh the tool registry." },
     { name: "get_skills", description: "Read skill files for a connector, command, or tool." },
     { name: "get_tool_source", description: "Report the source (yaml/template/help/mixed) of a tool." },
+    { name: "list_tool_categories", description: "List tool categories (connector / command prefix) for progressive discovery." },
+    { name: "list_tools_by_category", description: "List tool summaries in a category (use get_tool_schema for full schema)." },
+    { name: "search_tools", description: "Search tools by name, description, or command path." },
+    { name: "get_tool_schema", description: "Return full inputSchema for one tool by name." },
+    {
+        name: "call_tool",
+        description: "Execute any registry CLI tool by name (required for exposure_mode lazy when the host only registers tools/list). Args: name, arguments (object).",
+    },
 ];
 export class MetaTools {
     deps;
@@ -28,7 +41,7 @@ export class MetaTools {
         this.deps = deps;
     }
     list() {
-        return [...META_DEFS];
+        return buildMetaToolListEntries(META_DEFS);
     }
     has(name) {
         return META_DEFS.some((m) => m.name === name);
@@ -45,6 +58,55 @@ export class MetaTools {
                 return this.getSkills(args);
             case "get_tool_source":
                 return this.getToolSource(args);
+            case "list_tool_categories":
+                return { ok: true, categories: listToolCategories(this.deps.registry) };
+            case "list_tools_by_category": {
+                const category = args.category;
+                if (!category)
+                    return { ok: false, error: "missing 'category' argument" };
+                const limit = typeof args.limit === "number" ? args.limit : 200;
+                const { tools, unknown_category } = listToolsByCategory(this.deps.registry, category, limit);
+                return {
+                    ok: true,
+                    category,
+                    tools,
+                    unknown_category,
+                    ...(unknown_category ? { hint: "Unknown category id; use list_tool_categories for valid ids." } : {}),
+                };
+            }
+            case "search_tools": {
+                const query = args.query;
+                if (!query)
+                    return { ok: false, error: "missing 'query' argument" };
+                const limit = typeof args.limit === "number" ? args.limit : 50;
+                return { ok: true, query, tools: searchTools(this.deps.registry, query, limit) };
+            }
+            case "get_tool_schema": {
+                const toolName = args.name;
+                if (!toolName)
+                    return { ok: false, error: "missing 'name' argument" };
+                return getToolSchema(this.deps.registry, toolName);
+            }
+            case "call_tool": {
+                const toolName = normalizeRegistryToolName(args.name);
+                if (!toolName) {
+                    return {
+                        ok: false,
+                        error: "missing or invalid 'name' (use a string tool name, e.g. git_status; do not pass nested JSON as name)",
+                    };
+                }
+                if (!this.deps.executor) {
+                    return { ok: false, error: "call_tool unavailable (executor not wired)" };
+                }
+                const toolArgs = args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
+                    ? args.arguments
+                    : {};
+                return executeDynamicTool({
+                    registry: this.deps.registry,
+                    executor: this.deps.executor,
+                    connectors: this.deps.connectors,
+                }, toolName, toolArgs);
+            }
             default:
                 return { ok: false, error: `unknown meta tool: ${name}` };
         }
@@ -84,9 +146,8 @@ export class MetaTools {
                 .listTools()
                 .filter((t) => t.connectorName === c.name);
             const sc = summarizeSources(connectorTools);
-            // binary_on_path: spawn `binary --version` (then --help) with 5s timeout.
-            // Catches ENOENT, non-zero exit, and timeout — never throws.
-            const binaryOnPath = await checkBinaryOnPath(c.binary, c.working_dir);
+            const env = c.env ? { ...process.env, ...c.env } : process.env;
+            const probe = await probeConnectorBinary(c, env);
             connectors.push({
                 name: c.name,
                 binary: c.binary,
@@ -95,7 +156,14 @@ export class MetaTools {
                 last_scan_status: latestScan?.status ?? null,
                 last_scan_error: latestScan?.error ?? null,
                 tool_count: connectorTools.length,
-                binary_on_path: binaryOnPath,
+                /** @deprecated use executor_probe.ok — same spawn path as CommandExecutor */
+                binary_on_path: probe.ok,
+                executor_probe: {
+                    ok: probe.ok,
+                    tried_argv: probe.tried_argv,
+                    exit_code: probe.exit_code,
+                    stderr_snippet: probe.stderr_snippet || undefined,
+                },
                 discovery: { parser: discoveryParser },
                 parser_resolved: parserResolved,
                 skills,
@@ -108,11 +176,13 @@ export class MetaTools {
             });
         }
         const configDir = resolve(this.deps.config.configDir);
+        const bg = this.deps.getBackgroundDiscoveryStatus?.() ?? null;
         return {
             ok: true,
             config_hash: this.deps.config.configHash,
             config_dir: configDir,
             cache: { tools_count: this.deps.registry.size() },
+            background_discovery: bg,
             parsers,
             connectors,
         };
@@ -121,45 +191,28 @@ export class MetaTools {
         const { engine, parserRegistry } = await buildDiscoveryEngine(this.deps.config, {
             parserRegistry: this.deps.parserRegistry,
             log: this.deps.log,
+            cache: this.deps.cache,
         });
         this.deps.parserRegistry = parserRegistry;
-        const previous = this.deps.registry.listTools();
-        const byConnector = new Map();
-        for (const t of previous) {
-            const list = byConnector.get(t.connectorName) ?? [];
-            list.push(t);
-            byConnector.set(t.connectorName, list);
-        }
+        const byConnector = snapshotRegistryByConnector(this.deps.registry);
         let failures = 0;
         let refreshedCount = 0;
         let anySuccess = false;
         for (const conn of this.deps.config.connectors) {
             if (!conn.enabled)
                 continue;
-            const scanRunId = this.deps.cache.startScanRun(conn.name);
             try {
-                const discovered = await engine.discover(conn, this.deps.config);
+                const discovered = await discoverOneConnector(engine, conn, this.deps.config, (m) => this.deps.log?.(m), this.deps.cache);
                 byConnector.set(conn.name, discovered);
                 refreshedCount += discovered.length;
                 anySuccess = true;
-                this.deps.cache.finishScanRun(scanRunId, "ok", null);
-                const sc = summarizeSources(discovered);
-                this.deps.log?.(`discovery summary: ${conn.name} tools=${discovered.length} yaml=${sc.yaml} template=${sc.template} help=${sc.help} mixed=${sc.mixed}`);
             }
-            catch (err) {
+            catch {
                 failures++;
-                this.deps.cache.finishScanRun(scanRunId, "failed", String(err));
-                this.deps.log?.(`refresh failed for ${conn.name}: ${String(err)}`);
-                // Keep byConnector entry from previous snapshot for this connector.
             }
-        }
-        const merged = [];
-        for (const conn of this.deps.config.connectors) {
-            merged.push(...(byConnector.get(conn.name) ?? []));
         }
         if (anySuccess) {
-            this.deps.cache.replaceTools(this.deps.config.configHash, merged);
-            this.deps.registry.replaceAll(merged);
+            applyMergedTools(this.deps.config, this.deps.registry, this.deps.cache, byConnector);
         }
         return {
             ok: failures === 0,
@@ -261,24 +314,6 @@ export class MetaTools {
             command: tool.command,
         };
     }
-}
-/**
- * Check whether a CLI binary is reachable on PATH by spawning `binary --version`
- * (falling back to `binary --help`). Returns true only on exit code 0; catches
- * ENOENT, non-zero exit, and timeout (5s) — never throws, so doctor stays
- * crash-free even when a binary is missing.
- */
-function checkBinaryOnPath(binary, workingDir, timeoutMs = 5000) {
-    const opts = {
-        timeout: timeoutMs,
-        cwd: workingDir ?? undefined,
-        // Avoid inheriting stdio that could hang the child on prompts.
-        windowsHide: true,
-    };
-    const tryCmd = (cmd) => new Promise((resolve) => {
-        exec(cmd, opts, (err) => resolve(!err));
-    });
-    return tryCmd(`"${binary}" --version`).then((ok) => (ok ? true : tryCmd(`"${binary}" --help`)));
 }
 /**
  * Resolve a user-provided relative path under skill_root. Rejects `..`, absolute

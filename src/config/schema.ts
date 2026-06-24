@@ -33,6 +33,21 @@ export const DiscoveryConfig = z.object({
   /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
   template: z.string().optional(),
   include_subgroups: z.array(z.string()).optional(),
+  help_argv: z.array(z.string()).min(1).optional(),
+  materialize_global_args: z.boolean().optional(),
+  global_arg_allowlist: z.array(z.string()).optional(),
+  global_arg_denylist: z.array(z.string()).optional(),
+  concurrency: z.number().int().positive().max(32).optional(),
+  /** BFS dequeue order: shallow paths first yields more leaf tools under a time budget. */
+  bfs_preference: z.enum(["fifo", "shallow_first"]).optional(),
+  /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
+  startup_budget_seconds: z.number().int().positive().max(3600).optional(),
+  /**
+   * After budget-limited startup, continue help discovery in the background (default true when budget is set).
+   * Set false to only use refresh_tools manually.
+   */
+  background_continue_discovery: z.boolean().optional(),
+  exposure_mode: z.enum(["flat", "lazy"]).optional(),
 });
 export type DiscoveryConfig = z.infer<typeof DiscoveryConfig>;
 
@@ -43,6 +58,8 @@ export const ConnectorConfig = z.object({
   argv_prefix: z.array(z.string()).optional(),
   enabled: z.boolean().default(true),
   default_timeout_seconds: z.number().positive().optional(),
+  /** Timeout for each `--help` / `-h` spawn during discovery (default 25s). */
+  help_timeout_seconds: z.number().positive().max(300).optional(),
   working_dir: z.string().nullable().optional(),
   env: z.record(z.string(), z.string()).optional(),
   discovery: DiscoveryConfig.optional(),
@@ -64,11 +81,23 @@ export const ToolDecl = z.object({
 });
 export type ToolDecl = z.infer<typeof ToolDecl>;
 
+export const RuntimeConfig = z.object({
+  /**
+   * Max concurrent help subprocesses across all connectors (default 24).
+   * Per-connector concurrency still applies but shares this global cap.
+   */
+  max_inflight_help_spawns: z.number().int().positive().max(128).optional(),
+  /** Cold start: discover enabled connectors in parallel (default true). */
+  parallel_connector_discovery: z.boolean().optional(),
+});
+export type RuntimeConfig = z.infer<typeof RuntimeConfig>;
+
 export const Config = z.object({
   version: z.literal(1),
   connectors: z.array(ConnectorConfig),
   tools: z.record(z.string(), ToolDecl).optional(),
   skills: z.array(z.string()).optional(),
+  runtime: RuntimeConfig.optional(),
 });
 export type Config = z.infer<typeof Config>;
 

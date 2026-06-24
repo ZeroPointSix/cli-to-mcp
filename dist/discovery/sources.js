@@ -6,6 +6,8 @@ import { HelpParserRegistry } from "./parser-registry.js";
 import { genericPlugin } from "./plugins/generic.js";
 import { cobraPlugin } from "./plugins/cobra.js";
 import { toolFromDiscovered } from "../builder/tool-from-discovered.js";
+import { scanHelpTree } from "./help-discovery.js";
+import { discoveryFingerprint } from "./help-cache-key.js";
 /** Merge artifacts into final ToolDefinitions. Later entries win on conflicts. */
 export function mergeArtifacts(artifacts) {
     // Sort by priority: help (lowest) -> template -> yaml (highest).
@@ -117,69 +119,63 @@ export class HelpSource {
     parserRegistry;
     runHelpFn;
     log;
+    cache;
     constructor(opts) {
         this.parserRegistry = opts?.parserRegistry ?? createDefaultParserRegistry();
         this.runHelpFn = opts?.runHelpFn ?? runHelp;
         this.log = opts?.log ?? (() => { });
+        this.cache = opts?.cache;
     }
     async discover(connector, _config) {
         const mode = connector.discovery?.mode ?? "help";
         if (mode !== "help")
             return [];
+        const discoverT0 = Date.now();
         /** Default 5: recurse help tree up to 5 command segments; deeper paths are not scanned (ADR 0006). */
         const maxDepth = connector.discovery?.max_depth ?? 5;
         this.log(`help discovery: ${connector.name} max_depth=${maxDepth}`);
         const parserId = connector.discovery?.parser;
-        const helpTimeoutMs = (connector.default_timeout_seconds ?? 10) * 1000;
+        const helpTimeoutMs = (connector.help_timeout_seconds ?? connector.default_timeout_seconds ?? 25) * 1000;
         const includeSubgroups = connector.discovery?.include_subgroups;
+        const startupBudgetMs = connector.discovery?.startup_budget_seconds
+            ? connector.discovery.startup_budget_seconds * 1000
+            : undefined;
+        const concurrency = connector.discovery?.concurrency ?? (startupBudgetMs != null ? 24 : 16);
+        const fp = discoveryFingerprint(connector);
+        const cachedPages = this.cache?.countHelpCache(connector.name, fp) ?? 0;
+        this.log(`help discovery: ${connector.name} concurrency=${concurrency} help_timeout_ms=${helpTimeoutMs}${cachedPages > 0 ? ` help_cache_hits=${cachedPages}` : ""}`);
+        if (startupBudgetMs) {
+            this.log(`help discovery: ${connector.name} startup_budget_seconds=${connector.discovery.startup_budget_seconds}`);
+        }
+        const bfsPreference = connector.discovery?.bfs_preference ?? (startupBudgetMs ? "shallow_first" : "fifo");
+        const nodes = await scanHelpTree({
+            connector,
+            maxDepth,
+            includeSubgroups,
+            parserId,
+            helpTimeoutMs,
+            concurrency,
+            runHelpFn: this.runHelpFn,
+            parserRegistry: this.parserRegistry,
+            log: this.log,
+            cache: this.cache,
+            startupBudgetMs,
+            bfsPreference,
+        });
         const artifacts = [];
-        const visited = new Set();
-        // BFS queue of { path }.
-        const queue = [{ path: [] }];
-        while (queue.length > 0) {
-            const { path } = queue.shift();
-            const key = path.join(" ");
-            if (visited.has(key))
-                continue;
-            visited.add(key);
-            const out = await this.runHelpFn(connector.binary, path, {
-                timeoutMs: helpTimeoutMs,
-                env: connector.env ? { ...process.env, ...connector.env } : undefined,
-                cwd: connector.working_dir ?? undefined,
-                argvPrefix: connector.argv_prefix ? [...connector.argv_prefix] : undefined,
-            });
-            if (!out.rawHelp)
-                continue;
-            const ctx = {
-                connectorName: connector.name,
-                binary: connector.binary,
-                path,
-                rawHelp: out.rawHelp,
-                exitCode: out.exitCode,
-            };
-            const cmd = this.parserRegistry.parse(ctx, parserId);
-            const usedParser = this.parserRegistry.selectPlugin(ctx, parserId);
-            this.log(`help node: ${connector.name} path=[${path.join(" ")}] parser=${usedParser?.id ?? "none"} subcommands=${cmd.subcommands.length}`);
-            // Enqueue subcommands if within depth and not filtered.
-            if (path.length < maxDepth) {
-                let subs = cmd.subcommands;
-                if (path.length === 0 && includeSubgroups && includeSubgroups.length > 0) {
-                    subs = subs.filter((s) => includeSubgroups.includes(s));
-                }
-                for (const sub of subs) {
-                    queue.push({ path: [...path, sub] });
-                }
-            }
-            // Tool generation rule (see tool-from-discovered.ts): only leaf commands
-            // become tools. Root and intermediate nodes are traversal only.
+        for (const { cmd } of nodes) {
             const isLeaf = cmd.subcommands.length === 0;
-            if (!isLeaf || path.length === 0)
+            if (!isLeaf || cmd.path.length === 0)
                 continue;
             const tool = toolFromDiscovered(cmd, connector);
             if (!tool)
                 continue;
             artifacts.push({ tool, kind: "help", confidence: 0.35, key: tool.name });
         }
+        const elapsedMs = Date.now() - discoverT0;
+        const leafCount = artifacts.length;
+        const tpm = elapsedMs > 0 ? ((leafCount * 60_000) / elapsedMs).toFixed(0) : "0";
+        this.log(`help discovery: ${connector.name} leaf_tools=${leafCount} nodes=${nodes.length} elapsed_ms=${elapsedMs} tools_per_min~${tpm} bfs=${bfsPreference}`);
         return artifacts;
     }
 }

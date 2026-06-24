@@ -37,6 +37,7 @@ export class ConfigLoader {
         }
         return {
             config,
+            runtime: config.runtime,
             configDir,
             connectors,
             tools,

@@ -1,0 +1,21 @@
+# 全量 az help 发现压测（无 include_subgroups，issue #15 加速项全开）
+version: 1
+
+connectors:
+  - name: az
+    binary: az
+    enabled: true
+    default_timeout_seconds: 120
+    help_timeout_seconds: 25
+    env:
+      AZURE_CORE_COLLECT_TELEMETRY: "false"
+      AZURE_CORE_DISABLE_TELEMETRY: "true"
+    discovery:
+      mode: help
+      parser: generic
+      max_depth: 3
+      startup_budget_seconds: 300
+      help_argv: ["-h"]
+      concurrency: 16
+      exposure_mode: lazy
+      materialize_global_args: false

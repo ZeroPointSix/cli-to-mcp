@@ -15,6 +15,7 @@ import {
 
 export type LoadedConfig = {
   config: Config;
+  runtime: Config["runtime"];
   /** Absolute directory of the config file, used as base for relative paths. */
   configDir: string;
   /** Connectors with relative paths resolved to absolute. */
@@ -73,6 +74,7 @@ export class ConfigLoader {
 
     return {
       config,
+      runtime: config.runtime,
       configDir,
       connectors,
       tools,

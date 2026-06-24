@@ -45,6 +45,21 @@ export declare const DiscoveryConfig: z.ZodObject<{
     /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
     template: z.ZodOptional<z.ZodString>;
     include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    help_argv: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    materialize_global_args: z.ZodOptional<z.ZodBoolean>;
+    global_arg_allowlist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    global_arg_denylist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    concurrency: z.ZodOptional<z.ZodNumber>;
+    /** BFS dequeue order: shallow paths first yields more leaf tools under a time budget. */
+    bfs_preference: z.ZodOptional<z.ZodEnum<["fifo", "shallow_first"]>>;
+    /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
+    startup_budget_seconds: z.ZodOptional<z.ZodNumber>;
+    /**
+     * After budget-limited startup, continue help discovery in the background (default true when budget is set).
+     * Set false to only use refresh_tools manually.
+     */
+    background_continue_discovery: z.ZodOptional<z.ZodBoolean>;
+    exposure_mode: z.ZodOptional<z.ZodEnum<["flat", "lazy"]>>;
 }, "strip", z.ZodTypeAny, {
     mode: "help" | "manual" | "none";
     max_depth?: number | undefined;
@@ -52,6 +67,15 @@ export declare const DiscoveryConfig: z.ZodObject<{
     parser_module?: string | undefined;
     template?: string | undefined;
     include_subgroups?: string[] | undefined;
+    help_argv?: string[] | undefined;
+    materialize_global_args?: boolean | undefined;
+    global_arg_allowlist?: string[] | undefined;
+    global_arg_denylist?: string[] | undefined;
+    concurrency?: number | undefined;
+    bfs_preference?: "fifo" | "shallow_first" | undefined;
+    startup_budget_seconds?: number | undefined;
+    background_continue_discovery?: boolean | undefined;
+    exposure_mode?: "flat" | "lazy" | undefined;
 }, {
     mode?: "help" | "manual" | "none" | undefined;
     max_depth?: number | undefined;
@@ -59,6 +83,15 @@ export declare const DiscoveryConfig: z.ZodObject<{
     parser_module?: string | undefined;
     template?: string | undefined;
     include_subgroups?: string[] | undefined;
+    help_argv?: string[] | undefined;
+    materialize_global_args?: boolean | undefined;
+    global_arg_allowlist?: string[] | undefined;
+    global_arg_denylist?: string[] | undefined;
+    concurrency?: number | undefined;
+    bfs_preference?: "fifo" | "shallow_first" | undefined;
+    startup_budget_seconds?: number | undefined;
+    background_continue_discovery?: boolean | undefined;
+    exposure_mode?: "flat" | "lazy" | undefined;
 }>;
 export type DiscoveryConfig = z.infer<typeof DiscoveryConfig>;
 export declare const ConnectorConfig: z.ZodObject<{
@@ -68,6 +101,8 @@ export declare const ConnectorConfig: z.ZodObject<{
     argv_prefix: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     enabled: z.ZodDefault<z.ZodBoolean>;
     default_timeout_seconds: z.ZodOptional<z.ZodNumber>;
+    /** Timeout for each `--help` / `-h` spawn during discovery (default 25s). */
+    help_timeout_seconds: z.ZodOptional<z.ZodNumber>;
     working_dir: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     env: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
     discovery: z.ZodOptional<z.ZodObject<{
@@ -79,6 +114,21 @@ export declare const ConnectorConfig: z.ZodObject<{
         /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
         template: z.ZodOptional<z.ZodString>;
         include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        help_argv: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        materialize_global_args: z.ZodOptional<z.ZodBoolean>;
+        global_arg_allowlist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        global_arg_denylist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        concurrency: z.ZodOptional<z.ZodNumber>;
+        /** BFS dequeue order: shallow paths first yields more leaf tools under a time budget. */
+        bfs_preference: z.ZodOptional<z.ZodEnum<["fifo", "shallow_first"]>>;
+        /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
+        startup_budget_seconds: z.ZodOptional<z.ZodNumber>;
+        /**
+         * After budget-limited startup, continue help discovery in the background (default true when budget is set).
+         * Set false to only use refresh_tools manually.
+         */
+        background_continue_discovery: z.ZodOptional<z.ZodBoolean>;
+        exposure_mode: z.ZodOptional<z.ZodEnum<["flat", "lazy"]>>;
     }, "strip", z.ZodTypeAny, {
         mode: "help" | "manual" | "none";
         max_depth?: number | undefined;
@@ -86,6 +136,15 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        help_argv?: string[] | undefined;
+        materialize_global_args?: boolean | undefined;
+        global_arg_allowlist?: string[] | undefined;
+        global_arg_denylist?: string[] | undefined;
+        concurrency?: number | undefined;
+        bfs_preference?: "fifo" | "shallow_first" | undefined;
+        startup_budget_seconds?: number | undefined;
+        background_continue_discovery?: boolean | undefined;
+        exposure_mode?: "flat" | "lazy" | undefined;
     }, {
         mode?: "help" | "manual" | "none" | undefined;
         max_depth?: number | undefined;
@@ -93,6 +152,15 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        help_argv?: string[] | undefined;
+        materialize_global_args?: boolean | undefined;
+        global_arg_allowlist?: string[] | undefined;
+        global_arg_denylist?: string[] | undefined;
+        concurrency?: number | undefined;
+        bfs_preference?: "fifo" | "shallow_first" | undefined;
+        startup_budget_seconds?: number | undefined;
+        background_continue_discovery?: boolean | undefined;
+        exposure_mode?: "flat" | "lazy" | undefined;
     }>>;
     /** Directory of skill files; paths relative to config file directory. */
     skill_root: z.ZodOptional<z.ZodString>;
@@ -103,6 +171,7 @@ export declare const ConnectorConfig: z.ZodObject<{
     enabled: boolean;
     argv_prefix?: string[] | undefined;
     default_timeout_seconds?: number | undefined;
+    help_timeout_seconds?: number | undefined;
     working_dir?: string | null | undefined;
     env?: Record<string, string> | undefined;
     discovery?: {
@@ -112,6 +181,15 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        help_argv?: string[] | undefined;
+        materialize_global_args?: boolean | undefined;
+        global_arg_allowlist?: string[] | undefined;
+        global_arg_denylist?: string[] | undefined;
+        concurrency?: number | undefined;
+        bfs_preference?: "fifo" | "shallow_first" | undefined;
+        startup_budget_seconds?: number | undefined;
+        background_continue_discovery?: boolean | undefined;
+        exposure_mode?: "flat" | "lazy" | undefined;
     } | undefined;
     skill_root?: string | undefined;
     skills?: string[] | undefined;
@@ -121,6 +199,7 @@ export declare const ConnectorConfig: z.ZodObject<{
     argv_prefix?: string[] | undefined;
     enabled?: boolean | undefined;
     default_timeout_seconds?: number | undefined;
+    help_timeout_seconds?: number | undefined;
     working_dir?: string | null | undefined;
     env?: Record<string, string> | undefined;
     discovery?: {
@@ -130,6 +209,15 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        help_argv?: string[] | undefined;
+        materialize_global_args?: boolean | undefined;
+        global_arg_allowlist?: string[] | undefined;
+        global_arg_denylist?: string[] | undefined;
+        concurrency?: number | undefined;
+        bfs_preference?: "fifo" | "shallow_first" | undefined;
+        startup_budget_seconds?: number | undefined;
+        background_continue_discovery?: boolean | undefined;
+        exposure_mode?: "flat" | "lazy" | undefined;
     } | undefined;
     skill_root?: string | undefined;
     skills?: string[] | undefined;
@@ -214,6 +302,22 @@ export declare const ToolDecl: z.ZodObject<{
     } | undefined;
 }>;
 export type ToolDecl = z.infer<typeof ToolDecl>;
+export declare const RuntimeConfig: z.ZodObject<{
+    /**
+     * Max concurrent help subprocesses across all connectors (default 24).
+     * Per-connector concurrency still applies but shares this global cap.
+     */
+    max_inflight_help_spawns: z.ZodOptional<z.ZodNumber>;
+    /** Cold start: discover enabled connectors in parallel (default true). */
+    parallel_connector_discovery: z.ZodOptional<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    max_inflight_help_spawns?: number | undefined;
+    parallel_connector_discovery?: boolean | undefined;
+}, {
+    max_inflight_help_spawns?: number | undefined;
+    parallel_connector_discovery?: boolean | undefined;
+}>;
+export type RuntimeConfig = z.infer<typeof RuntimeConfig>;
 export declare const Config: z.ZodObject<{
     version: z.ZodLiteral<1>;
     connectors: z.ZodArray<z.ZodObject<{
@@ -223,6 +327,8 @@ export declare const Config: z.ZodObject<{
         argv_prefix: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         enabled: z.ZodDefault<z.ZodBoolean>;
         default_timeout_seconds: z.ZodOptional<z.ZodNumber>;
+        /** Timeout for each `--help` / `-h` spawn during discovery (default 25s). */
+        help_timeout_seconds: z.ZodOptional<z.ZodNumber>;
         working_dir: z.ZodOptional<z.ZodNullable<z.ZodString>>;
         env: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
         discovery: z.ZodOptional<z.ZodObject<{
@@ -234,6 +340,21 @@ export declare const Config: z.ZodObject<{
             /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
             template: z.ZodOptional<z.ZodString>;
             include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            help_argv: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            materialize_global_args: z.ZodOptional<z.ZodBoolean>;
+            global_arg_allowlist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            global_arg_denylist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            concurrency: z.ZodOptional<z.ZodNumber>;
+            /** BFS dequeue order: shallow paths first yields more leaf tools under a time budget. */
+            bfs_preference: z.ZodOptional<z.ZodEnum<["fifo", "shallow_first"]>>;
+            /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
+            startup_budget_seconds: z.ZodOptional<z.ZodNumber>;
+            /**
+             * After budget-limited startup, continue help discovery in the background (default true when budget is set).
+             * Set false to only use refresh_tools manually.
+             */
+            background_continue_discovery: z.ZodOptional<z.ZodBoolean>;
+            exposure_mode: z.ZodOptional<z.ZodEnum<["flat", "lazy"]>>;
         }, "strip", z.ZodTypeAny, {
             mode: "help" | "manual" | "none";
             max_depth?: number | undefined;
@@ -241,6 +362,15 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            help_argv?: string[] | undefined;
+            materialize_global_args?: boolean | undefined;
+            global_arg_allowlist?: string[] | undefined;
+            global_arg_denylist?: string[] | undefined;
+            concurrency?: number | undefined;
+            bfs_preference?: "fifo" | "shallow_first" | undefined;
+            startup_budget_seconds?: number | undefined;
+            background_continue_discovery?: boolean | undefined;
+            exposure_mode?: "flat" | "lazy" | undefined;
         }, {
             mode?: "help" | "manual" | "none" | undefined;
             max_depth?: number | undefined;
@@ -248,6 +378,15 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            help_argv?: string[] | undefined;
+            materialize_global_args?: boolean | undefined;
+            global_arg_allowlist?: string[] | undefined;
+            global_arg_denylist?: string[] | undefined;
+            concurrency?: number | undefined;
+            bfs_preference?: "fifo" | "shallow_first" | undefined;
+            startup_budget_seconds?: number | undefined;
+            background_continue_discovery?: boolean | undefined;
+            exposure_mode?: "flat" | "lazy" | undefined;
         }>>;
         /** Directory of skill files; paths relative to config file directory. */
         skill_root: z.ZodOptional<z.ZodString>;
@@ -258,6 +397,7 @@ export declare const Config: z.ZodObject<{
         enabled: boolean;
         argv_prefix?: string[] | undefined;
         default_timeout_seconds?: number | undefined;
+        help_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
         env?: Record<string, string> | undefined;
         discovery?: {
@@ -267,6 +407,15 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            help_argv?: string[] | undefined;
+            materialize_global_args?: boolean | undefined;
+            global_arg_allowlist?: string[] | undefined;
+            global_arg_denylist?: string[] | undefined;
+            concurrency?: number | undefined;
+            bfs_preference?: "fifo" | "shallow_first" | undefined;
+            startup_budget_seconds?: number | undefined;
+            background_continue_discovery?: boolean | undefined;
+            exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
         skills?: string[] | undefined;
@@ -276,6 +425,7 @@ export declare const Config: z.ZodObject<{
         argv_prefix?: string[] | undefined;
         enabled?: boolean | undefined;
         default_timeout_seconds?: number | undefined;
+        help_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
         env?: Record<string, string> | undefined;
         discovery?: {
@@ -285,6 +435,15 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            help_argv?: string[] | undefined;
+            materialize_global_args?: boolean | undefined;
+            global_arg_allowlist?: string[] | undefined;
+            global_arg_denylist?: string[] | undefined;
+            concurrency?: number | undefined;
+            bfs_preference?: "fifo" | "shallow_first" | undefined;
+            startup_budget_seconds?: number | undefined;
+            background_continue_discovery?: boolean | undefined;
+            exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
         skills?: string[] | undefined;
@@ -368,6 +527,21 @@ export declare const Config: z.ZodObject<{
         } | undefined;
     }>>>;
     skills: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    runtime: z.ZodOptional<z.ZodObject<{
+        /**
+         * Max concurrent help subprocesses across all connectors (default 24).
+         * Per-connector concurrency still applies but shares this global cap.
+         */
+        max_inflight_help_spawns: z.ZodOptional<z.ZodNumber>;
+        /** Cold start: discover enabled connectors in parallel (default true). */
+        parallel_connector_discovery: z.ZodOptional<z.ZodBoolean>;
+    }, "strip", z.ZodTypeAny, {
+        max_inflight_help_spawns?: number | undefined;
+        parallel_connector_discovery?: boolean | undefined;
+    }, {
+        max_inflight_help_spawns?: number | undefined;
+        parallel_connector_discovery?: boolean | undefined;
+    }>>;
 }, "strip", z.ZodTypeAny, {
     version: 1;
     connectors: {
@@ -376,6 +550,7 @@ export declare const Config: z.ZodObject<{
         enabled: boolean;
         argv_prefix?: string[] | undefined;
         default_timeout_seconds?: number | undefined;
+        help_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
         env?: Record<string, string> | undefined;
         discovery?: {
@@ -385,6 +560,15 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            help_argv?: string[] | undefined;
+            materialize_global_args?: boolean | undefined;
+            global_arg_allowlist?: string[] | undefined;
+            global_arg_denylist?: string[] | undefined;
+            concurrency?: number | undefined;
+            bfs_preference?: "fifo" | "shallow_first" | undefined;
+            startup_budget_seconds?: number | undefined;
+            background_continue_discovery?: boolean | undefined;
+            exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
         skills?: string[] | undefined;
@@ -410,6 +594,10 @@ export declare const Config: z.ZodObject<{
             format: "json" | "text";
         } | undefined;
     }> | undefined;
+    runtime?: {
+        max_inflight_help_spawns?: number | undefined;
+        parallel_connector_discovery?: boolean | undefined;
+    } | undefined;
 }, {
     version: 1;
     connectors: {
@@ -418,6 +606,7 @@ export declare const Config: z.ZodObject<{
         argv_prefix?: string[] | undefined;
         enabled?: boolean | undefined;
         default_timeout_seconds?: number | undefined;
+        help_timeout_seconds?: number | undefined;
         working_dir?: string | null | undefined;
         env?: Record<string, string> | undefined;
         discovery?: {
@@ -427,6 +616,15 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            help_argv?: string[] | undefined;
+            materialize_global_args?: boolean | undefined;
+            global_arg_allowlist?: string[] | undefined;
+            global_arg_denylist?: string[] | undefined;
+            concurrency?: number | undefined;
+            bfs_preference?: "fifo" | "shallow_first" | undefined;
+            startup_budget_seconds?: number | undefined;
+            background_continue_discovery?: boolean | undefined;
+            exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
         skills?: string[] | undefined;
@@ -452,6 +650,10 @@ export declare const Config: z.ZodObject<{
             format?: "json" | "text" | undefined;
         } | undefined;
     }> | undefined;
+    runtime?: {
+        max_inflight_help_spawns?: number | undefined;
+        parallel_connector_discovery?: boolean | undefined;
+    } | undefined;
 }>;
 export type Config = z.infer<typeof Config>;
 /**

@@ -20,6 +20,7 @@ import type { CommandExecutor } from "../executor/command-executor.js";
 import type { NormalizedResult } from "../executor/result-normalizer.js";
 import { normalize } from "../executor/result-normalizer.js";
 import type { ResolvedConnector } from "../config/config-loader.js";
+import type { JsonSchema } from "../registry/tool-definition.js";
 
 export type McpServerOptions = {
   host: string;
@@ -34,7 +35,7 @@ export type McpServerOptions = {
 export type MetaToolHandlers = {
   has(name: string): boolean;
   call(name: string, args: Record<string, unknown>): Promise<unknown>;
-  list(): Array<{ name: string; description: string }>;
+  list(): Array<{ name: string; description: string; inputSchema?: JsonSchema }>;
 };
 
 type Session = {
@@ -58,21 +59,27 @@ export class CliToMcpServer {
     );
 
     server.setRequestHandler(ListToolsRequestSchema, async (_req: ListToolsRequest) => {
-      const tools = this.opts.registry.listTools().map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema,
-      }));
+      const tools = this.opts.registry
+        .listTools()
+        .filter((t) => {
+          const conn = this.opts.connectors.get(t.connectorName);
+          return (conn?.discovery?.exposure_mode ?? "flat") !== "lazy";
+        })
+        .map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+        }));
       const meta = this.opts.metaTools?.list() ?? [];
       for (const m of meta) {
         tools.push({
           name: m.name,
           description: m.description,
-          inputSchema: {
+          inputSchema: m.inputSchema ?? {
             type: "object" as const,
             properties: {},
             required: [],
-            additionalProperties: true,
+            additionalProperties: false,
           },
         });
       }

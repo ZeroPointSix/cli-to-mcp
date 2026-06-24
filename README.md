@@ -64,6 +64,23 @@ MCP 端点：**`http://127.0.0.1:28989/mcp`**
 | `refresh_tools` | 改配置后重新发现工具 |
 | `get_skills` | 读取本地 skill 说明 |
 | `get_tool_source` | 查看工具来自 yaml / template / help |
+| `list_tool_categories` | 按 connector / 命令前缀列出工具分类（渐进式发现） |
+| `list_tools_by_category` | 列出某分类下的工具摘要（需配合 `get_tool_schema`） |
+| `search_tools` | 按名称、描述或命令路径搜索工具 |
+| `get_tool_schema` | 获取单个工具的完整 `inputSchema` |
+
+#### 大连接器（如 Azure CLI）
+
+工具数量极大时，在 connector 的 `discovery` 中设置 `exposure_mode: lazy`，`tools/list` 不再展开全部子命令，改用上表后四个元工具分层浏览。示例配置见 **`examples/az/cli-to-mcp.yaml`**，常用发现字段：
+
+- `concurrency` — help 树 BFS 并行度（如 `4`）
+- `include_subgroups` — 只扫描指定顶层子命令，缩短首次发现
+- `help_argv` — 每个节点的 help 参数（如 `["-h"]`）
+- `materialize_global_args` — 是否把 Global Arguments 物化进叶子工具 schema（大 CLI 建议 `false`）
+- `argv_prefix` — 可选，如 Python 启动：`["-m", "azure.cli"]`（系统 `az` 可省略）
+- `parser_module` — 可选，加载自定义 help 解析器模块
+
+说明见 **`examples/az/README.md`**。
 
 ## Discovery 模式
 
@@ -83,6 +100,7 @@ MCP 端点：**`http://127.0.0.1:28989/mcp`**
 
 - `examples/git/cli-to-mcp.yaml` — 仅 Git
 - `examples/demo/cli-to-mcp.yaml` — gh + git
+- `examples/az/cli-to-mcp.yaml` — Azure CLI 大连接器（lazy + 渐进式元工具）
 
 复制到项目目录后改 `--config` 路径即可。
 

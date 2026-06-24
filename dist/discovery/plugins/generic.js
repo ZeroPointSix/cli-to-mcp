@@ -18,6 +18,7 @@ export const genericPlugin = {
         const subcommands = [];
         const args = [];
         let section = "none";
+        let optionsSectionIsGlobal = false;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
@@ -37,6 +38,7 @@ export const genericPlugin = {
             }
             if (OPTIONS_SECTION.test(trimmed)) {
                 section = "options";
+                optionsSectionIsGlobal = /^global\s+(arguments|options|flags)/i.test(trimmed);
                 continue;
             }
             if (section === "commands") {
@@ -51,8 +53,10 @@ export const genericPlugin = {
             }
             if (section === "options") {
                 const opt = parseOptionLine(trimmed);
-                if (opt && !isHelpFlag(opt))
+                if (opt && !isHelpFlag(opt)) {
+                    opt.fromGlobalSection = optionsSectionIsGlobal;
                     args.push(opt);
+                }
                 continue;
             }
             // Description: first non-trivial line near the top.

@@ -7,6 +7,7 @@ dist/
 Thumbs.db
 .vite/
 **/.cli-to-mcp/
+.bench-az-1k/
 **/*.sqlite
 **/*.sqlite-shm
 **/*.sqlite-wal

@@ -9,6 +9,11 @@ import { CacheStore } from "../src/cache/db.js";
 import { defineTool } from "../src/registry/tool-definition.js";
 import type { LoadedConfig, ResolvedConnector } from "../src/config/config-loader.js";
 import { createDefaultParserRegistry } from "../src/discovery/sources.js";
+import { CommandExecutor } from "../src/executor/command-executor.js";
+import { fileURLToPath } from "node:url";
+
+const MOCK_CLI = fileURLToPath(new URL("./fixtures/mock-cli.js", import.meta.url));
+const NODE = process.execPath;
 
 let dir: string;
 let cache: CacheStore;
@@ -62,7 +67,7 @@ afterEach(() => {
 });
 
 describe("MetaTools.list / has", () => {
-  it("lists 5 fixed meta tools", () => {
+  it("lists fixed meta tools including progressive discovery", () => {
     const { meta } = setup();
     const names = meta.list().map((m) => m.name);
     expect(names).toEqual([
@@ -71,6 +76,11 @@ describe("MetaTools.list / has", () => {
       "refresh_tools",
       "get_skills",
       "get_tool_source",
+      "list_tool_categories",
+      "list_tools_by_category",
+      "search_tools",
+      "get_tool_schema",
+      "call_tool",
     ]);
     expect(meta.has("doctor")).toBe(true);
     expect(meta.has("not_a_meta_tool")).toBe(false);
@@ -200,7 +210,7 @@ describe("MetaTools.refresh_tools", () => {
       skills: [],
       skill_root: null,
       working_dir: null,
-      discovery: { mode: "help" },
+      discovery: { mode: "manual" },
     };
     // ResolvedTool needs skills/connector/command; provide a full declaration.
     const resolvedTools = {
@@ -686,5 +696,291 @@ describe("resolvePathUnderSkillRoot", () => {
     const root = join(dir, "skills");
     const r = resolvePathUnderSkillRoot(root, "../package.json");
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("MetaTools.list_tool_categories", () => {
+  it("returns ok and categories with connector and prefix entries", async () => {
+    const tools = [
+      defineTool({
+        name: "gh_pr_view",
+        description: "view a pull request",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["pr", "view"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+      defineTool({
+        name: "gh_pr_list",
+        description: "list pull requests",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["pr", "list"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+      defineTool({
+        name: "gh_issue_view",
+        description: "view an issue",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["issue", "view"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+    ];
+    const { meta } = setup({ toolsInRegistry: tools });
+    const res: any = await meta.call("list_tool_categories", {});
+    expect(res.ok).toBe(true);
+    expect(Array.isArray(res.categories)).toBe(true);
+    const ids = res.categories.map((c: any) => c.id);
+    expect(ids).toContain("connector:gh");
+    expect(ids).toContain("prefix:gh:pr");
+    expect(ids).toContain("prefix:gh:issue");
+    // Each category has tool_count
+    for (const cat of res.categories) {
+      expect(typeof cat.tool_count).toBe("number");
+    }
+  });
+
+  it("returns empty categories when registry has no tools", async () => {
+    const { meta } = setup();
+    const res: any = await meta.call("list_tool_categories", {});
+    expect(res.ok).toBe(true);
+    expect(res.categories).toEqual([]);
+  });
+});
+
+describe("MetaTools.list_tools_by_category", () => {
+  it("returns ok and tools for connector category", async () => {
+    const prTool = defineTool({
+      name: "gh_pr_view",
+      description: "view pr",
+      connectorName: "gh",
+      binary: "gh",
+      command: ["pr", "view"],
+      args: [],
+      skillRefs: [],
+      source: "help",
+      enabled: true,
+    });
+    const { meta } = setup({ toolsInRegistry: [prTool] });
+    const res: any = await meta.call("list_tools_by_category", { category: "connector:gh" });
+    expect(res.ok).toBe(true);
+    expect(res.category).toBe("connector:gh");
+    expect(Array.isArray(res.tools)).toBe(true);
+    expect(res.tools.length).toBe(1);
+    expect(res.tools[0].name).toBe("gh_pr_view");
+    expect(res.tools[0].connector).toBe("gh");
+  });
+
+  it("returns ok and tools for prefix category", async () => {
+    const tools = [
+      defineTool({
+        name: "gh_pr_view",
+        description: "view pr",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["pr", "view"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+      defineTool({
+        name: "gh_pr_list",
+        description: "list prs",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["pr", "list"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+      defineTool({
+        name: "gh_issue_view",
+        description: "view issue",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["issue", "view"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+    ];
+    const { meta } = setup({ toolsInRegistry: tools });
+    const res: any = await meta.call("list_tools_by_category", { category: "prefix:gh:pr" });
+    expect(res.ok).toBe(true);
+    expect(res.tools.map((t: any) => t.name).sort()).toEqual(["gh_pr_list", "gh_pr_view"]);
+  });
+
+  it("returns missing args error", async () => {
+    const { meta } = setup();
+    const res: any = await meta.call("list_tools_by_category", {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("category");
+  });
+});
+
+describe("MetaTools.search_tools", () => {
+  it("returns ok and matching tools by query", async () => {
+    const tools = [
+      defineTool({
+        name: "gh_pr_view",
+        description: "view a pull request",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["pr", "view"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+      defineTool({
+        name: "gh_issue_list",
+        description: "list issues",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["issue", "list"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+    ];
+    const { meta } = setup({ toolsInRegistry: tools });
+    const res: any = await meta.call("search_tools", { query: "pr" });
+    expect(res.ok).toBe(true);
+    expect(res.query).toBe("pr");
+    expect(Array.isArray(res.tools)).toBe(true);
+    expect(res.tools.length).toBe(1);
+    expect(res.tools[0].name).toBe("gh_pr_view");
+  });
+
+  it("searches by description too", async () => {
+    const tools = [
+      defineTool({
+        name: "gh_x",
+        description: "manage pull requests",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["x"],
+        args: [],
+        skillRefs: [],
+        source: "help",
+        enabled: true,
+      }),
+      defineTool({
+        name: "gh_y",
+        description: "something else",
+        connectorName: "gh",
+        binary: "gh",
+        command: ["y"],
+        args: [],
+        skillRefs: [],
+        source: "yaml",
+        enabled: true,
+      }),
+    ];
+    const { meta } = setup({ toolsInRegistry: tools });
+    const res: any = await meta.call("search_tools", { query: "pull request" });
+    expect(res.ok).toBe(true);
+    expect(res.tools.length).toBe(1);
+    expect(res.tools[0].name).toBe("gh_x");
+  });
+
+  it("returns missing args error", async () => {
+    const { meta } = setup();
+    const res: any = await meta.call("search_tools", {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("query");
+  });
+});
+
+describe("MetaTools.get_tool_schema", () => {
+  it("returns ok and schema for a registered tool", async () => {
+    const tool = defineTool({
+      name: "gh_pr_view",
+      description: "view a pull request",
+      connectorName: "gh",
+      binary: "gh",
+      command: ["pr", "view"],
+      args: [
+        { name: "number", type: "number", required: true, description: "PR number" },
+        { name: "json", type: "boolean", required: false, description: "output as JSON" },
+      ],
+      skillRefs: [],
+      source: "help",
+      enabled: true,
+    });
+    const { meta } = setup({ toolsInRegistry: [tool] });
+    const res: any = await meta.call("get_tool_schema", { name: "gh_pr_view" });
+    expect(res.ok).toBe(true);
+    expect(res.name).toBe("gh_pr_view");
+    expect(res.description).toBe("view a pull request");
+    expect(res.connector).toBe("gh");
+    expect(res.command).toEqual(["pr", "view"]);
+    expect(res.inputSchema).toBeDefined();
+    expect(res.inputSchema.properties.number).toBeDefined();
+    expect(res.inputSchema.properties.json).toBeDefined();
+  });
+
+  it("returns missing args error", async () => {
+    const { meta } = setup();
+    const res: any = await meta.call("get_tool_schema", {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("name");
+  });
+
+  it("returns error for unknown tool", async () => {
+    const { meta } = setup();
+    const res: any = await meta.call("get_tool_schema", { name: "nonexistent_tool" });
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("not found");
+  });
+});
+
+describe("MetaTools.call_tool (lazy execution bridge)", () => {
+  it("executes a registry tool not exposed on tools/list", async () => {
+    const lazyTool = defineTool({
+      name: "git_status",
+      description: "git status via mock",
+      connectorName: "gh",
+      binary: NODE,
+      command: [MOCK_CLI],
+      args: [],
+      skillRefs: [],
+      source: "template",
+      enabled: true,
+    });
+    const { meta, connector, config } = setup({ toolsInRegistry: [lazyTool] });
+    const metaExec = new MetaTools({
+      registry,
+      cache,
+      config,
+      connectors: new Map([[connector.name, connector]]),
+      executor: new CommandExecutor(),
+      log: () => {},
+    });
+    const res: any = await metaExec.call("call_tool", { name: "git_status", arguments: {} });
+    expect(res.tool).toBe("git_status");
+    expect(res.ok).toBe(true);
+    expect(JSON.parse(res.stdout).args).toEqual([]);
+  });
+
+  it("returns error when name missing", async () => {
+    const { meta } = setup();
+    const res: any = await meta.call("call_tool", {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("name");
   });
 });

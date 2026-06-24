@@ -1,0 +1,21 @@
+# 全部 connector 使用 lazy：tools/list 应只剩 9 个 meta（注册表里仍有 yaml/help 工具）
+version: 1
+
+connectors:
+  - name: gh
+    binary: gh
+    enabled: true
+    default_timeout_seconds: 30
+    discovery:
+      mode: help
+      parser: cobra
+      max_depth: 1
+      exposure_mode: lazy
+
+tools:
+  gh_pr_list:
+    enabled: true
+    connector: gh
+    command: ["pr", "list"]
+    description: YAML tool (hidden from list when lazy)
+    default_args: ["-L", "3"]

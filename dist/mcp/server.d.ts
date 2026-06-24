@@ -1,6 +1,7 @@
 import type { ToolRegistry } from "../registry/tool-registry.js";
 import type { CommandExecutor } from "../executor/command-executor.js";
 import type { ResolvedConnector } from "../config/config-loader.js";
+import type { JsonSchema } from "../registry/tool-definition.js";
 export type McpServerOptions = {
     host: string;
     port: number;
@@ -16,6 +17,7 @@ export type MetaToolHandlers = {
     list(): Array<{
         name: string;
         description: string;
+        inputSchema?: JsonSchema;
     }>;
 };
 export declare class CliToMcpServer {

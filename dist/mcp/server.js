@@ -20,7 +20,13 @@ export class CliToMcpServer {
     createSessionServer() {
         const server = new Server({ name: "cli-to-mcp", version: "0.1.0" }, { capabilities: { tools: {} } });
         server.setRequestHandler(ListToolsRequestSchema, async (_req) => {
-            const tools = this.opts.registry.listTools().map((t) => ({
+            const tools = this.opts.registry
+                .listTools()
+                .filter((t) => {
+                const conn = this.opts.connectors.get(t.connectorName);
+                return (conn?.discovery?.exposure_mode ?? "flat") !== "lazy";
+            })
+                .map((t) => ({
                 name: t.name,
                 description: t.description,
                 inputSchema: t.inputSchema,
@@ -30,11 +36,11 @@ export class CliToMcpServer {
                 tools.push({
                     name: m.name,
                     description: m.description,
-                    inputSchema: {
+                    inputSchema: m.inputSchema ?? {
                         type: "object",
                         properties: {},
                         required: [],
-                        additionalProperties: true,
+                        additionalProperties: false,
                     },
                 });
             }

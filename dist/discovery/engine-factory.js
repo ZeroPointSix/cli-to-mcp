@@ -2,9 +2,23 @@ import { pathToFileURL } from "node:url";
 import { DiscoveryEngine } from "./discovery-engine.js";
 import { YamlSource, TemplateSource, HelpSource, createDefaultParserRegistry, } from "./sources.js";
 import { loadBuiltinPacks } from "./template-registry.js";
+import { runHelp } from "./help-runner.js";
 export async function buildDiscoveryEngine(config, opts = {}) {
     const parserRegistry = opts.parserRegistry ?? createDefaultParserRegistry();
     await loadParserModules(config, parserRegistry, opts.log);
+    const baseRunHelp = opts.runHelpFn ?? runHelp;
+    const gate = opts.helpSpawnGate;
+    const runHelpFn = gate == null
+        ? baseRunHelp
+        : async (binary, path, helpOpts) => {
+            await gate.acquire();
+            try {
+                return await baseRunHelp(binary, path, helpOpts);
+            }
+            finally {
+                gate.release();
+            }
+        };
     return {
         engine: new DiscoveryEngine([
             new YamlSource(),
@@ -12,7 +26,8 @@ export async function buildDiscoveryEngine(config, opts = {}) {
             new HelpSource({
                 parserRegistry,
                 log: opts.log,
-                runHelpFn: opts.runHelpFn,
+                runHelpFn,
+                cache: opts.cache,
             }),
         ]),
         parserRegistry,

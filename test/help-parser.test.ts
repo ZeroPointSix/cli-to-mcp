@@ -149,7 +149,8 @@ describe("runHelp", () => {
   });
 
   it("returns empty rawHelp when binary missing", async () => {
-    const out = await runHelp("definitely-not-a-real-binary-xyz", []);
+    // Use a path-shaped name so Windows does not route through cmd.exe (which prints errors to stdout).
+    const out = await runHelp("C:/definitely-not-a-real-binary-xyz.exe", []);
     expect(out.rawHelp).toBe("");
   });
 });

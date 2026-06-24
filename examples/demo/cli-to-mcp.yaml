@@ -1,4 +1,4 @@
-# 演示：GitHub CLI (gh) + Git 同一 MCP 服务（端口 28989）
+# 演示：GitHub CLI (gh) + Git — lazy 暴露 + 并发发现（端口 28989）
 version: 1
 
 connectors:
@@ -10,6 +10,9 @@ connectors:
       mode: help
       parser: cobra
       max_depth: 3
+      concurrency: 8
+      exposure_mode: lazy
+      materialize_global_args: false
     skills:
       - ../gh/skills/gh.md
 
@@ -21,11 +24,13 @@ connectors:
       mode: help
       parser: generic
       max_depth: 2
+      concurrency: 4
+      exposure_mode: lazy
+      materialize_global_args: false
     skills:
       - ../git/skills/git.md
 
 tools:
-  # gh 示例里常用的 4 个显式 yaml 工具（与 examples/gh 一致，便于 JSON 输出）
   gh_pr_view:
     enabled: true
     connector: gh

@@ -11,6 +11,7 @@
  * collide with META_TOOL_NAMES; if it would, the tool is skipped (return null).
  */
 import { defineTool, META_TOOL_NAMES } from "../registry/tool-definition.js";
+import { globalArgFilterOpts, shouldMaterializeArg } from "../discovery/global-args.js";
 export function buildToolName(connectorName, path) {
     const segments = [connectorName, ...path];
     return segments
@@ -24,8 +25,9 @@ export function toolFromDiscovered(cmd, connector) {
     const name = buildToolName(cmd.connectorName, cmd.path);
     if (META_TOOL_NAMES.has(name))
         return null;
+    const filterOpts = globalArgFilterOpts(connector.discovery);
     const args = cmd.args
-        .filter((a) => !isHelpArg(a))
+        .filter((a) => shouldMaterializeArg(a, filterOpts, a.fromGlobalSection === true))
         .map((a) => toToolArg(a));
     const description = cmd.description ??
         cmd.usage ??
@@ -42,9 +44,6 @@ export function toolFromDiscovered(cmd, connector) {
         source: "help",
         enabled: true,
     });
-}
-function isHelpArg(a) {
-    return a.name === "help" || a.name === "h" || a.aliases?.includes("-h") === true;
 }
 function toToolArg(a) {
     const type = mapType(a.inferredType);

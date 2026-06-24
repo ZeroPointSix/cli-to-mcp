@@ -207,8 +207,7 @@ Options:
       expect(a.confidence).toBeLessThan(0.5);
     }
     const run = arts.find((a) => a.key === "demo_run")!.tool;
-    expect(run.args.map((x) => x.name).sort()).toEqual(["name", "verbose"]);
-    expect(run.args.find((x) => x.name === "verbose").type).toBe("boolean");
+    expect(run.args.map((x) => x.name).sort()).toEqual(["name"]);
     expect(run.args.find((x) => x.name === "name").type).toBe("string");
     // --help must never appear in schema
     expect(run.args.find((x) => x.name === "help")).toBeUndefined();

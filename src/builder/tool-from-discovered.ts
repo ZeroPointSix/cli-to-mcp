@@ -14,6 +14,7 @@ import { defineTool, META_TOOL_NAMES, type ToolDefinition } from "../registry/to
 import type { DiscoveredArg, DiscoveredCommand } from "../discovery/types.js";
 import type { ResolvedConnector } from "../config/config-loader.js";
 import type { ArgType } from "../config/schema.js";
+import { globalArgFilterOpts, shouldMaterializeArg } from "../discovery/global-args.js";
 
 export function buildToolName(connectorName: string, path: string[]): string {
   const segments = [connectorName, ...path];
@@ -32,8 +33,9 @@ export function toolFromDiscovered(
   const name = buildToolName(cmd.connectorName, cmd.path);
   if (META_TOOL_NAMES.has(name)) return null;
 
+  const filterOpts = globalArgFilterOpts(connector.discovery);
   const args = cmd.args
-    .filter((a) => !isHelpArg(a))
+    .filter((a) => shouldMaterializeArg(a, filterOpts, a.fromGlobalSection === true))
     .map((a) => toToolArg(a));
 
   const description =
@@ -53,10 +55,6 @@ export function toolFromDiscovered(
     source: "help",
     enabled: true,
   });
-}
-
-function isHelpArg(a: DiscoveredArg): boolean {
-  return a.name === "help" || a.name === "h" || a.aliases?.includes("-h") === true;
 }
 
 function toToolArg(a: DiscoveredArg): ToolDefinition["args"][number] {

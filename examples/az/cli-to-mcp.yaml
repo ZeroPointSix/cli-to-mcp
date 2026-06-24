@@ -1,0 +1,37 @@
+# Issue #15 示例：Azure CLI（az）大连接器
+# 演示 help 树发现、并发扫描、lazy 暴露、全局参数过滤与可选 argv_prefix。
+version: 1
+
+connectors:
+  - name: az
+    binary: az
+    # 系统 PATH 中的 az 可省略 argv_prefix。
+    # 若通过 Python 模块启动，可取消注释：
+    # argv_prefix: ["-m", "azure.cli"]
+    enabled: true
+    default_timeout_seconds: 120
+    help_timeout_seconds: 25
+    env:
+      AZURE_CORE_COLLECT_TELEMETRY: "false"
+      AZURE_CORE_DISABLE_TELEMETRY: "true"
+    discovery:
+      mode: help
+      parser: generic
+      # 自定义解析器（需先实现并导出 plugin）：
+      # parser_module: ./parsers/az-parser.mjs
+      max_depth: 3
+      # 约 5 分钟内先 serve；后台继续发现并增量合并工具（doctor.background_discovery）
+      startup_budget_seconds: 300
+      background_continue_discovery: true
+      # 仅扫描这些一级子命令，缩短首次发现时间（示例；可按需增删）
+      include_subgroups:
+        - account
+        - group
+      # az 常用 -h；也可写 ["--help"] 或与官方一致
+      help_argv: ["-h"]
+      concurrency: 16
+      exposure_mode: lazy
+      # 默认不把 Global Arguments（--help/--debug 等）物化到叶子工具 schema
+      materialize_global_args: false
+      # global_arg_allowlist: ["subscription", "output"]
+      # global_arg_denylist: ["debug"]

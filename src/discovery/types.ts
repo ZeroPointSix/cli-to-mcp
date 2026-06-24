@@ -14,6 +14,7 @@ export type DiscoveredArg = {
   repeatable?: boolean;
   inferredType?: "string" | "boolean" | "integer" | "number" | "array";
   enumValues?: string[];
+  fromGlobalSection?: boolean;
 };
 
 export type DiscoveredCommand = {

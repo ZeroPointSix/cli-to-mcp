@@ -9,12 +9,16 @@ import {
 } from "./sources.js";
 import { loadBuiltinPacks } from "./template-registry.js";
 import type { HelpParserRegistry, HelpParserPlugin } from "./parser-registry.js";
-import type { runHelp } from "./help-runner.js";
+import { runHelp } from "./help-runner.js";
+import type { CacheStore } from "../cache/db.js";
+import type { HelpSpawnGate } from "./help-spawn-gate.js";
 
 export type BuildDiscoveryEngineOptions = {
   parserRegistry?: HelpParserRegistry;
   log?: (msg: string) => void;
   runHelpFn?: typeof runHelp;
+  cache?: CacheStore;
+  helpSpawnGate?: HelpSpawnGate;
 };
 
 export async function buildDiscoveryEngine(
@@ -23,6 +27,19 @@ export async function buildDiscoveryEngine(
 ): Promise<{ engine: DiscoveryEngine; parserRegistry: HelpParserRegistry }> {
   const parserRegistry = opts.parserRegistry ?? createDefaultParserRegistry();
   await loadParserModules(config, parserRegistry, opts.log);
+  const baseRunHelp = opts.runHelpFn ?? runHelp;
+  const gate = opts.helpSpawnGate;
+  const runHelpFn: typeof runHelp =
+    gate == null
+      ? baseRunHelp
+      : async (binary, path, helpOpts) => {
+          await gate.acquire();
+          try {
+            return await baseRunHelp(binary, path, helpOpts);
+          } finally {
+            gate.release();
+          }
+        };
   return {
     engine: new DiscoveryEngine([
       new YamlSource(),
@@ -30,7 +47,8 @@ export async function buildDiscoveryEngine(
       new HelpSource({
         parserRegistry,
         log: opts.log,
-        runHelpFn: opts.runHelpFn,
+        runHelpFn,
+        cache: opts.cache,
       }),
     ]),
     parserRegistry,

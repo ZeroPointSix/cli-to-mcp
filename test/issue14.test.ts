@@ -204,7 +204,16 @@ describe("issue #14 config-only connector fixes", () => {
       ComSpec: "C:/Windows/System32/cmd.exe",
     });
     expect(prepared.command).toContain("cmd.exe");
-    expect(prepared.args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
-    expect(prepared.args[3]).toContain('"az" "account" "list"');
+    if (prepared.args[1] === "/s") {
+      expect(prepared.args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
+      expect(prepared.args[3]).toMatch(/account.*list/);
+      expect(prepared.args[3]).toMatch(/az(\.cmd)?"/i);
+    } else {
+      // Resolved full-path az.cmd uses cmd /d /c path arg...
+      expect(prepared.args[0]).toBe("/d");
+      expect(prepared.args[1]).toBe("/c");
+      expect(prepared.args[2]).toMatch(/az\.cmd$/i);
+      expect(prepared.args.slice(3)).toEqual(["account", "list"]);
+    }
   });
 });

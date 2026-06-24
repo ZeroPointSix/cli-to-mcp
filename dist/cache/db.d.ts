@@ -53,6 +53,34 @@ export declare class CacheStore {
         parsed_json: string | null;
     }>): void;
     getCommands(connectorName: string): CommandRow[];
+    getHelpCache(key: {
+        connector_name: string;
+        fingerprint: string;
+        path_key: string;
+    }): {
+        raw_help: string;
+        exit_code: number | null;
+    } | undefined;
+    putHelpCache(key: {
+        connector_name: string;
+        fingerprint: string;
+        path_key: string;
+        raw_help: string;
+        exit_code: number | null;
+    }): void;
+    countHelpCache(connectorName: string, fingerprint: string): number;
+    /** Load all cached help pages for a connector fingerprint (one query per scan). */
+    loadHelpCacheMap(connectorName: string, fingerprint: string): Map<string, {
+        raw_help: string;
+        exit_code: number | null;
+    }>;
+    putHelpCacheBatch(rows: Array<{
+        connector_name: string;
+        fingerprint: string;
+        path_key: string;
+        raw_help: string;
+        exit_code: number | null;
+    }>): void;
     /**
      * Atomically replace all tools for a given configHash. Old tools with a
      * DIFFERENT configHash are retained so refresh failure can fall back to them.

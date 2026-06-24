@@ -1,0 +1,42 @@
+# gh + az 同进程：5 分钟首启预算 + 全局 help 并发闸门 + lazy 暴露
+version: 1
+
+runtime:
+  max_inflight_help_spawns: 24
+  parallel_connector_discovery: true
+
+connectors:
+  - name: gh
+    binary: gh
+    enabled: true
+    default_timeout_seconds: 60
+    help_timeout_seconds: 20
+    discovery:
+      mode: help
+      parser: cobra
+      max_depth: 3
+      concurrency: 8
+      startup_budget_seconds: 300
+      background_continue_discovery: true
+      bfs_preference: shallow_first
+      exposure_mode: lazy
+
+  - name: az
+    binary: az
+    enabled: true
+    default_timeout_seconds: 120
+    help_timeout_seconds: 20
+    env:
+      AZURE_CORE_COLLECT_TELEMETRY: "false"
+      AZURE_CORE_DISABLE_TELEMETRY: "true"
+    discovery:
+      mode: help
+      parser: generic
+      max_depth: 3
+      concurrency: 16
+      startup_budget_seconds: 300
+      background_continue_discovery: true
+      bfs_preference: shallow_first
+      help_argv: ["-h"]
+      exposure_mode: lazy
+      materialize_global_args: false

@@ -17,6 +17,7 @@ import type { ToolDefinition } from "../registry/tool-definition.js";
 import { TemplateRegistry } from "./template-registry.js";
 import { runHelp } from "./help-runner.js";
 import { HelpParserRegistry } from "./parser-registry.js";
+import type { CacheStore } from "../cache/db.js";
 export type DiscoveryArtifact = {
     tool: ToolDefinition;
     /** Which source produced this artifact. */
@@ -71,10 +72,12 @@ export declare class HelpSource implements DiscoverySource {
     private parserRegistry;
     private runHelpFn;
     private log;
+    private cache?;
     constructor(opts?: {
         parserRegistry?: HelpParserRegistry;
         runHelpFn?: typeof runHelp;
         log?: (msg: string) => void;
+        cache?: CacheStore;
     });
     discover(connector: ResolvedConnector, _config: LoadedConfig): Promise<DiscoveryArtifact[]>;
 }

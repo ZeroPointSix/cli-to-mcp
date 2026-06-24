@@ -37,6 +37,7 @@ export const genericPlugin: HelpParserPlugin = {
     const subcommands: string[] = [];
     const args: DiscoveredArg[] = [];
     let section: "none" | "commands" | "options" = "none";
+    let optionsSectionIsGlobal = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -57,6 +58,7 @@ export const genericPlugin: HelpParserPlugin = {
       }
       if (OPTIONS_SECTION.test(trimmed)) {
         section = "options";
+        optionsSectionIsGlobal = /^global\s+(arguments|options|flags)/i.test(trimmed);
         continue;
       }
 
@@ -72,7 +74,10 @@ export const genericPlugin: HelpParserPlugin = {
 
       if (section === "options") {
         const opt = parseOptionLine(trimmed);
-        if (opt && !isHelpFlag(opt)) args.push(opt);
+        if (opt && !isHelpFlag(opt)) {
+          opt.fromGlobalSection = optionsSectionIsGlobal;
+          args.push(opt);
+        }
         continue;
       }
 

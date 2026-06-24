@@ -1,0 +1,47 @@
+# gh + git 全部 lazy + 并发 help 扫描（issue #15 演示，端口建议 28989）
+version: 1
+
+connectors:
+  - name: gh
+    binary: gh
+    enabled: true
+    default_timeout_seconds: 30
+    skill_root: ./skills
+    skills:
+      - ./skills/gh-demo.md
+      - ./skills/lazy-agent-flow.md
+    discovery:
+      mode: help
+      parser: cobra
+      max_depth: 3
+      concurrency: 8
+      exposure_mode: lazy
+      materialize_global_args: false
+
+  - name: git
+    binary: git
+    enabled: true
+    default_timeout_seconds: 30
+    skill_root: ./skills
+    skills:
+      - ./skills/git-demo.md
+      - ./skills/lazy-agent-flow.md
+    discovery:
+      mode: help
+      parser: generic
+      max_depth: 2
+      concurrency: 4
+      exposure_mode: lazy
+      materialize_global_args: false
+
+tools:
+  gh_pr_list:
+    enabled: true
+    connector: gh
+    command: ["pr", "list"]
+    description: YAML 工具（lazy 下不出现在 tools/list，可 search + call）
+    default_args: ["--json", "number,title", "-L", "5"]
+    output:
+      format: json
+    skills:
+      - ./skills/gh-pr-list.md

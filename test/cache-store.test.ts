@@ -77,6 +77,22 @@ describe("CacheStore", () => {
     db2.close();
   });
 
+  it("stores and reads help_cache rows", () => {
+    const db = new CacheStore(dbPath);
+    db.putHelpCache({
+      connector_name: "az",
+      fingerprint: "fp1",
+      path_key: "account list",
+      raw_help: "help text",
+      exit_code: 0,
+    });
+    expect(db.getHelpCache({ connector_name: "az", fingerprint: "fp1", path_key: "account list" })?.raw_help).toBe(
+      "help text",
+    );
+    expect(db.countHelpCache("az", "fp1")).toBe(1);
+    db.close();
+  });
+
   it("configHash change is detectable (old hash has no tools)", () => {
     const db = new CacheStore(dbPath);
     db.replaceTools("hashA", [mkTool("gh_pr_view")]);

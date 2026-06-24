@@ -7,14 +7,17 @@
  * - Does not throw on non-zero exit; many CLIs exit 0 for --help, some exit 1.
  */
 import { spawn } from "node:child_process";
+import { prepareSpawnCommand } from "../executor/spawn-command.js";
 import { stripAnsi } from "./plugins/generic.js";
 export async function runHelp(binary, path, opts = {}) {
-    const argv = [binary, ...(opts.argvPrefix ?? []), ...path, "--help"];
+    const helpTail = opts.helpArgv?.length ? opts.helpArgv : ["--help"];
+    const argv = [binary, ...(opts.argvPrefix ?? []), ...path, ...helpTail];
     const env = { ...(opts.env ?? process.env) };
     return new Promise((resolve) => {
         let child;
         try {
-            child = spawn(argv[0], argv.slice(1), {
+            const spawnCmd = prepareSpawnCommand(argv, process.platform, env);
+            child = spawn(spawnCmd.command, spawnCmd.args, {
                 env,
                 cwd: opts.cwd,
                 stdio: ["ignore", "pipe", "pipe"],

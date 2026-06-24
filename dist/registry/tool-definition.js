@@ -46,5 +46,10 @@ export const META_TOOL_NAMES = new Set([
     "refresh_tools",
     "get_skills",
     "get_tool_source",
+    "list_tool_categories",
+    "list_tools_by_category",
+    "search_tools",
+    "get_tool_schema",
+    "call_tool",
 ]);
 //# sourceMappingURL=tool-definition.js.map

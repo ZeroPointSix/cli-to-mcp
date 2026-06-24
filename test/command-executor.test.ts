@@ -174,7 +174,12 @@ describe("CommandExecutor.execute", () => {
   });
 
   it("reports binary not found (ENOENT)", async () => {
-    const t = mkTool({ binary: "definitely-not-a-real-binary-xyz-12345" });
+    // On win32, bare names are resolved via cmd.exe and fail with exit code, not ENOENT.
+    const missingBinary =
+      process.platform === "win32"
+        ? "C:\\no\\such\\binary-xyz.exe"
+        : "definitely-not-a-real-binary-xyz-12345";
+    const t = mkTool({ binary: missingBinary });
     const res = await ex.execute({ tool: t, args: {} });
     expect(res.binaryNotFound).toBe(true);
     expect(res.exitCode).toBe(null);
