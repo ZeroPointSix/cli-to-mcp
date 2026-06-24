@@ -76,6 +76,16 @@ node scripts/rebuild-tools-from-cache.mjs --cache-dir ./.bench-az-1k
 
 `bench-until-1000.mjs --keep-cache` 在 FAIL 时会自动尝试 phase 3 rebuild。
 
+### 端到端验证脚本（推荐按顺序）
+
+| 脚本 | 验证什么 |
+|------|----------|
+| `bench-e2e-bg-merge.mjs --cache-dir ./.bench-az-1k` | 满 `help_cache`、删 `tools` 行 → 冷启+后台 **数秒内** registry≥1000（全缓存命中） |
+| `bench-e2e-partial-cache.mjs` | 随机保留 ~15% help_cache → 冷启 **~500** → 后台补扫 **1～2h** → merge≥1000 |
+| `resume-bg-merge.mjs --cache-dir ./.bench-e2e-partial` | 中断后续跑：清 `tools`、保留已有 help_cache，等到 `merged registry` |
+
+看后台是否在涨：`doctor` / 日志里的 `merged registry_size=`、`[poll] registry=`。
+
 ---
 
 ## 日常 serve（生产）
