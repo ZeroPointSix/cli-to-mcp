@@ -255,6 +255,7 @@ describe("issue #14 config-only connector fixes", () => {
     expect(argv).toEqual(["python.exe", "-IBm", "azure.cli", "account", "list", "--output", "json"]);
     const prepared = prepareSpawnCommand(["az", "account", "list"], "win32", {
       ComSpec: "C:/Windows/System32/cmd.exe",
+      PATH: "",
     });
     expect(prepared.command).toContain("cmd.exe");
     if (prepared.args[1] === "/s") {

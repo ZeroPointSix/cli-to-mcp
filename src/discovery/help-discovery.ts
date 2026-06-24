@@ -90,6 +90,7 @@ async function fetchHelp(
     cwd: connector.working_dir ?? undefined,
     argvPrefix: connector.argv_prefix ? [...connector.argv_prefix] : undefined,
     helpArgv: helpFlags,
+    connectorName: connector.name,
   });
   if (!out.rawHelp) return null;
 
@@ -147,6 +148,7 @@ export async function scanHelpTree(opts: ScanHelpTreeOptions): Promise<HelpNodeR
   const pool = Math.max(1, Math.min(32, concurrency));
   const helpFlags = helpArgv(connector.discovery);
   const scanStart = Date.now();
+  let helpFailPruned = 0;
   let budgetClosed = false;
   let budgetTimer: ReturnType<typeof setTimeout> | undefined;
   let hardWallTimer: ReturnType<typeof setTimeout> | undefined;
@@ -193,7 +195,10 @@ export async function scanHelpTree(opts: ScanHelpTreeOptions): Promise<HelpNodeR
     visited.add(key);
 
     const help = await fetchHelp(opts, session, path, helpFlags);
-    if (!help) return;
+    if (!help) {
+      helpFailPruned++;
+      return;
+    }
 
     const { cmd, parserId: usedId } = parseNode(
       connector,
@@ -288,7 +293,7 @@ export async function scanHelpTree(opts: ScanHelpTreeOptions): Promise<HelpNodeR
 
   const queuedLeft = Math.max(0, tail - head);
   log(
-    `help discovery: ${connector.name} done nodes=${results.length} spawned=${spawnedCount} cache_hits=${cacheHits} pool=${pool}${budgetClosed ? ` budget_truncated queued_left=${queuedLeft}` : ""}`,
+    `help discovery: ${connector.name} done nodes=${results.length} spawned=${spawnedCount} cache_hits=${cacheHits} help_fail_pruned=${helpFailPruned} pool=${pool}${budgetClosed ? ` budget_truncated queued_left=${queuedLeft}` : ""}`,
   );
 
   return results;

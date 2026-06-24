@@ -29,6 +29,11 @@ import { executeDynamicTool } from "./execute-dynamic-tool.js";
 import { buildMetaToolListEntries } from "./meta-tool-schemas.js";
 import { normalizeRegistryToolName } from "./normalize-meta-args.js";
 import { probeConnectorBinary } from "../executor/binary-probe.js";
+import {
+  clearHelpSpawnErrorsForConnector,
+  getHelpSpawnErrorsForConnector,
+} from "../discovery/help-spawn-diagnostics.js";
+import { clearWinBinaryCache } from "../executor/resolve-binary.js";
 import type { BackgroundDiscoveryStatus } from "./background-discovery.js";
 import {
   applyMergedTools,
@@ -196,6 +201,11 @@ export class MetaTools implements MetaToolHandlers {
 
       const env = c.env ? { ...process.env, ...c.env } : process.env;
       const probe = await probeConnectorBinary(c, env);
+      const helpMode = (c.discovery?.mode ?? "help") === "help";
+      const zeroTools = connectorTools.length === 0;
+      const helpFailures = zeroTools && helpMode ? getHelpSpawnErrorsForConnector(c.name) : [];
+      const lastHelpForConnector =
+        zeroTools && helpFailures.length ? helpFailures[helpFailures.length - 1] : undefined;
 
       connectors.push({
         name: c.name,
@@ -212,7 +222,11 @@ export class MetaTools implements MetaToolHandlers {
           tried_argv: probe.tried_argv,
           exit_code: probe.exit_code,
           stderr_snippet: probe.stderr_snippet || undefined,
+          resolved_binary: probe.resolved_binary,
+          hint: probe.hint,
         },
+        last_help_spawn_error: lastHelpForConnector,
+        help_spawn_failures: helpFailures.length ? helpFailures : undefined,
         discovery: { parser: discoveryParser },
         parser_resolved: parserResolved,
         skills,
@@ -239,6 +253,7 @@ export class MetaTools implements MetaToolHandlers {
   }
 
   private async refreshTools() {
+    clearWinBinaryCache();
     const { engine, parserRegistry } = await buildDiscoveryEngine(this.deps.config, {
       parserRegistry: this.deps.parserRegistry,
       log: this.deps.log,
@@ -264,6 +279,7 @@ export class MetaTools implements MetaToolHandlers {
         byConnector.set(conn.name, discovered);
         refreshedCount += discovered.length;
         anySuccess = true;
+        if (discovered.length > 0) clearHelpSpawnErrorsForConnector(conn.name);
       } catch {
         failures++;
       }

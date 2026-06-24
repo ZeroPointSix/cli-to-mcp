@@ -56,12 +56,49 @@ describe("help discovery cache + worker pool", () => {
       cache,
       runHelpFn,
     };
-    await scanHelpTree(base);
+    const logs: string[] = [];
+    await scanHelpTree({ ...base, log: (m) => logs.push(m) });
     expect(spawns).toBe(2);
+    expect(logs.some((l) => l.includes("help_fail_pruned=0"))).toBe(true);
     spawns = 0;
     await scanHelpTree(base);
     expect(spawns).toBe(0);
     cache.close();
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("increments help_fail_pruned when runHelp returns empty", async () => {
+    const logs: string[] = [];
+    const reg = new HelpParserRegistry();
+    reg.register({
+      id: "t",
+      displayName: "t",
+      match: () => 100,
+      parse(ctx) {
+        return {
+          connectorName: ctx.connectorName,
+          path: ctx.path,
+          rawHelp: ctx.rawHelp,
+          args: [],
+          subcommands: [],
+        };
+      },
+    });
+    const runHelpFn = async () => ({
+      rawHelp: "",
+      exitCode: 1,
+      source: "stdout" as const,
+      timedOut: false,
+    });
+    await scanHelpTree({
+      connector: conn(),
+      maxDepth: 0,
+      helpTimeoutMs: 1000,
+      concurrency: 1,
+      parserRegistry: reg,
+      log: (m) => logs.push(m),
+      runHelpFn,
+    });
+    expect(logs.some((l) => /help_fail_pruned=1/.test(l))).toBe(true);
   });
 });

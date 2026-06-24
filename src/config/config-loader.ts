@@ -5,6 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { resolvePathUnderConfigDir } from "./path-safety.js";
 import { parse as parseYaml } from "yaml";
 import {
   validateConfig,
@@ -53,14 +54,14 @@ export class ConfigLoader {
 
     const connectors: ResolvedConnector[] = config.connectors.map((c) => ({
       ...c,
-      skills: (c.skills ?? []).map((s) => resolve(configDir, s)),
-      working_dir: c.working_dir ? resolve(configDir, c.working_dir) : null,
-      skill_root: c.skill_root ? resolve(configDir, c.skill_root) : null,
+      skills: (c.skills ?? []).map((s) => resolvePathUnderConfigDir(configDir, s)),
+      working_dir: c.working_dir ? resolvePathUnderConfigDir(configDir, c.working_dir) : null,
+      skill_root: c.skill_root ? resolvePathUnderConfigDir(configDir, c.skill_root) : null,
       discovery: c.discovery
         ? {
             ...c.discovery,
             parser_module: c.discovery.parser_module
-              ? resolve(configDir, c.discovery.parser_module)
+              ? resolvePathUnderConfigDir(configDir, c.discovery.parser_module)
               : undefined,
           }
         : { mode: "help" as const },
@@ -70,11 +71,11 @@ export class ConfigLoader {
     for (const [name, decl] of Object.entries(config.tools ?? {})) {
       tools[name] = {
         ...decl,
-        skills: (decl.skills ?? []).map((s) => resolve(configDir, s)),
+        skills: (decl.skills ?? []).map((s) => resolvePathUnderConfigDir(configDir, s)),
       };
     }
 
-    const parserModules = (config.parsers ?? []).map((p) => resolve(configDir, p));
+    const parserModules = (config.parsers ?? []).map((p) => resolvePathUnderConfigDir(configDir, p));
 
     return {
       config,

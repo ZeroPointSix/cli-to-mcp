@@ -10,6 +10,7 @@ import { defineTool } from "../src/registry/tool-definition.js";
 import type { LoadedConfig, ResolvedConnector } from "../src/config/config-loader.js";
 import { createDefaultParserRegistry } from "../src/discovery/sources.js";
 import { CommandExecutor } from "../src/executor/command-executor.js";
+import * as resolveBinary from "../src/executor/resolve-binary.js";
 import { fileURLToPath } from "node:url";
 
 const MOCK_CLI = fileURLToPath(new URL("./fixtures/mock-cli.js", import.meta.url));
@@ -236,7 +237,10 @@ describe("MetaTools.refresh_tools", () => {
       connectors: new Map([[connector.name, connector]]),
       log: () => {},
     });
+    const clearSpy = vi.spyOn(resolveBinary, "clearWinBinaryCache");
     const res: any = await meta.call("refresh_tools", {});
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
     expect(res.ok).toBe(true);
     expect(res.refreshed).toBeGreaterThanOrEqual(1);
     expect(registry.getTool("gh_pr_view")).not.toBeNull();

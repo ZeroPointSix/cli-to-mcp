@@ -1,4 +1,5 @@
 import { genericPlugin } from "./generic.js";
+import { parseCobraHelp } from "./cobra-parse.js";
 export const cobraPlugin = {
     id: "cobra",
     displayName: "Cobra-style (gh, many Go CLIs)",
@@ -15,8 +16,10 @@ export const cobraPlugin = {
         return 0;
     },
     parse(ctx) {
-        // Phase 1: delegate to generic. A dedicated cobra parser can be added
-        // later without changing the registry contract.
+        const parsed = parseCobraHelp(ctx);
+        if (parsed.subcommands.length > 0 || parsed.args.length > 0 || parsed.usage) {
+            return parsed;
+        }
         return genericPlugin.parse(ctx);
     },
 };

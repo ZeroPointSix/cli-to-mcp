@@ -3,7 +3,11 @@
  */
 import { spawn } from "node:child_process";
 import type { ResolvedConnector } from "../config/config-loader.js";
+import { decodeChildOutput } from "./child-output.js";
+import { appendChildOutput, maxChildOutputBytes } from "./output-limit.js";
 import { prepareSpawnCommand } from "./spawn-command.js";
+import { terminateChildProcess } from "./terminate-child.js";
+import { resolveSpawnBinary } from "./resolve-binary.js";
 
 export type BinaryProbeResult = {
   ok: boolean;
@@ -11,6 +15,9 @@ export type BinaryProbeResult = {
   exit_code: number | null;
   timed_out: boolean;
   stderr_snippet: string;
+  /** Windows: resolved path from `where`, or hint when bare name may fail. */
+  resolved_binary?: string;
+  hint?: string;
 };
 
 export function argvForConnectorProbe(
@@ -31,6 +38,8 @@ export function probeArgv(
 
   return new Promise((resolve) => {
     let stderr = "";
+    let stderrTrunc = false;
+    const outMax = maxChildOutputBytes();
     let timedOut = false;
     let child: ReturnType<typeof spawn>;
     try {
@@ -53,18 +62,27 @@ export function probeArgv(
       return;
     }
 
+    let killTimer: NodeJS.Timeout | undefined;
     const timer = setTimeout(() => {
       timedOut = true;
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        /* ignore */
-      }
+      terminateChildProcess(process.platform, child, "SIGTERM");
+      killTimer = setTimeout(() => {
+        terminateChildProcess(process.platform, child, "SIGKILL");
+      }, 500);
     }, timeoutMs);
 
-    child.stderr?.on("data", (d) => (stderr += d.toString()));
+    child.stdout?.on("data", () => {
+      /* drain stdout so probe cannot block on full pipe */
+    });
+    child.stderr?.on("data", (d) => {
+      if (stderrTrunc) return;
+      const r = appendChildOutput(stderr, decodeChildOutput(d), outMax);
+      stderr = r.text;
+      stderrTrunc = r.truncated;
+    });
     child.on("error", (err) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       resolve({
         ok: false,
         tried_argv,
@@ -75,6 +93,7 @@ export function probeArgv(
     });
     child.on("close", (code) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       resolve({
         ok: code === 0 && !timedOut,
         tried_argv,
@@ -84,6 +103,33 @@ export function probeArgv(
       });
     });
   });
+}
+
+function probeHints(
+  connector: Pick<ResolvedConnector, "binary">,
+  result: BinaryProbeResult,
+  env: NodeJS.ProcessEnv = process.env,
+): BinaryProbeResult {
+  if (result.ok) return result;
+  const binary = connector.binary;
+  const isBare =
+    process.platform === "win32" &&
+    !binary.includes("\\") &&
+    !binary.includes("/") &&
+    !/\.(exe|cmd|bat)$/i.test(binary);
+  const resolved =
+    process.platform === "win32" ? resolveSpawnBinary(binary, process.platform, env) : binary;
+  const out: BinaryProbeResult = {
+    ...result,
+    resolved_binary: process.platform === "win32" ? resolved : undefined,
+  };
+  if (isBare && resolved === binary) {
+    out.hint =
+      "On Windows, set connector.binary to the full path (e.g. C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd) when `where` fails.";
+  } else if (isBare && resolved !== binary) {
+    out.hint = `Resolved via where: ${resolved}`;
+  }
+  return out;
 }
 
 /** Same probe logic as tool execution: --version then --help. */
@@ -96,7 +142,7 @@ export async function probeConnectorBinary(
     cwd,
     env,
   });
-  if (v.ok) return v;
+  if (v.ok) return probeHints(connector, v, env);
   const h = await probeArgv(argvForConnectorProbe(connector, ["--help"]), { cwd, env });
-  return h;
+  return probeHints(connector, h, env);
 }

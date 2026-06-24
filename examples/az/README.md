@@ -6,6 +6,7 @@
 
 - Node.js ≥ 22
 - 本机已安装 [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)（`az` 在 PATH 中，或改用 `argv_prefix` 走 `python -m azure.cli`）
+- **Windows**：若 `where az` 失败或 help 发现为 0 工具，将 `binary` 设为 **`az.cmd` 全路径**（见根目录 README「Windows 建议」），并调用 `doctor` 查看 `executor_probe.hint` / `last_help_spawn_error`。
 
 ## 启动
 

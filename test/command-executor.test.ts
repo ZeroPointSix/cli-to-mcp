@@ -201,6 +201,19 @@ describe("CommandExecutor.execute", () => {
     expect(res.stdout).not.toContain("PWNED\n");
   });
 
+  it("merged env is used for spawn (EXEC-001: same env as child process)", async () => {
+    const t = mkTool({
+      args: [{ name: "number", type: "integer", required: false }],
+    });
+    const customComSpec = process.platform === "win32" ? process.env.ComSpec : undefined;
+    const res = await ex.execute({
+      tool: t,
+      args: { number: 1 },
+      env: customComSpec ? { ComSpec: customComSpec } : { MOCK_ENV_VAR: "overlay" },
+    });
+    expect(res.exitCode).toBe(0);
+  });
+
   it("inherits and overlays env", async () => {
     const t = mkTool({
       args: [{ name: "showenv", type: "boolean", required: false }],

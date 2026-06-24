@@ -233,6 +233,21 @@ connectors:
     expect(loaded.connectors[0].discovery.parser_module).toBe(join(dir, "parsers/my.ts"));
   });
 
+  it("rejects skill paths that escape config directory", () => {
+    const p = writeConfig(
+      "escape.yaml",
+      `
+version: 1
+connectors:
+  - name: x
+    binary: x
+    skills:
+      - ../../../outside.md
+`,
+    );
+    expect(() => new ConfigLoader().load(p)).toThrow(/escapes config directory/);
+  });
+
   it("throws on missing file", () => {
     expect(() => new ConfigLoader().load(join(dir, "nope.yaml"))).toThrow();
   });

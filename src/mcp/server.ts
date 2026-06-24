@@ -21,6 +21,12 @@ import type { NormalizedResult } from "../executor/result-normalizer.js";
 import { normalize } from "../executor/result-normalizer.js";
 import type { ResolvedConnector } from "../config/config-loader.js";
 import type { JsonSchema } from "../registry/tool-definition.js";
+import {
+  assertMcpHttpAuthorized,
+  readMcpHttpAuthFromEnv,
+  type McpHttpAuthConfig,
+} from "./http-auth.js";
+import { normalizeStreamableHttpAccept } from "./streamable-http-utils.js";
 
 export type McpServerOptions = {
   host: string;
@@ -30,6 +36,8 @@ export type McpServerOptions = {
   connectors: Map<string, ResolvedConnector>;
   metaTools?: MetaToolHandlers;
   log?: (msg: string) => void;
+  /** Override env; default readMcpHttpAuthFromEnv(). */
+  httpAuth?: McpHttpAuthConfig;
 };
 
 export type MetaToolHandlers = {
@@ -45,11 +53,21 @@ type Session = {
 
 export class CliToMcpServer {
   private readonly opts: McpServerOptions;
+  private readonly httpAuth: McpHttpAuthConfig;
   private httpServer: ReturnType<typeof createServer> | null = null;
   private readonly sessions = new Map<string, Session>();
 
   constructor(opts: McpServerOptions) {
     this.opts = opts;
+    this.httpAuth = opts.httpAuth ?? readMcpHttpAuthFromEnv();
+  }
+
+  sessionCount(): number {
+    return this.sessions.size;
+  }
+
+  isHttpAuthEnabled(): boolean {
+    return !!this.httpAuth.bearerToken;
   }
 
   private createSessionServer(): Server {
@@ -135,7 +153,18 @@ export class CliToMcpServer {
     await new Promise<void>((resolve) => {
       this.httpServer!.listen(this.opts.port, this.opts.host, () => resolve());
     });
-    this.opts.log?.(`cli-to-mcp listening on http://${this.opts.host}:${this.opts.port}/mcp`);
+    const authNote = this.httpAuth.bearerToken ? " (MCP bearer auth enabled)" : "";
+    this.opts.log?.(`cli-to-mcp listening on http://${this.opts.host}:${this.opts.port}/mcp${authNote}`);
+    if (
+      !this.httpAuth.bearerToken &&
+      this.opts.host !== "127.0.0.1" &&
+      this.opts.host !== "localhost" &&
+      this.opts.host !== "::1"
+    ) {
+      this.opts.log?.(
+        "warning: binding to a non-loopback host without CLI_TO_MCP_HTTP_BEARER_TOKEN — any client can call tools/call",
+      );
+    }
   }
 
   private sessionIdFrom(req: IncomingMessage): string | undefined {
@@ -147,11 +176,35 @@ export class CliToMcpServer {
 
   private async handleHttp(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const path = (req.url ?? "/").split("?")[0];
-    if (path !== "/mcp") {
-      res.writeHead(404, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "not found; use POST/GET /mcp" }));
+
+    if (path === "/health") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          status: "ok",
+          service: "cli-to-mcp",
+          mcp_path: "/mcp",
+          sessions: this.sessionCount(),
+          tools_in_registry: this.opts.registry.size(),
+          mcp_auth: this.isHttpAuthEnabled(),
+        }),
+      );
       return;
     }
+
+    if (path !== "/mcp") {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "not_found",
+          hint: "POST/GET/DELETE /mcp (Streamable HTTP); GET /health",
+        }),
+      );
+      return;
+    }
+
+    if (!assertMcpHttpAuthorized(req, res, this.httpAuth)) return;
+    normalizeStreamableHttpAccept(req);
 
     const sessionId = this.sessionIdFrom(req);
     let session = sessionId ? this.sessions.get(sessionId) : undefined;
@@ -170,7 +223,16 @@ export class CliToMcpServer {
       return;
     }
 
-    const parsedBody = await readJsonBody(req);
+    let parsedBody: unknown;
+    try {
+      parsedBody = await readJsonBody(req);
+    } catch (err) {
+      if (err instanceof HttpBodyTooLargeError) {
+        jsonRpcError(res, 413, -32000, err.message);
+        return;
+      }
+      throw err;
+    }
 
     if (!session && isInitializeRequest(parsedBody)) {
       const mcpServer = this.createSessionServer();
@@ -228,10 +290,31 @@ export class CliToMcpServer {
   }
 }
 
+const DEFAULT_MAX_HTTP_BODY = 1024 * 1024;
+
+function maxHttpBodyBytes(): number {
+  const raw = process.env.CLI_TO_MCP_MAX_HTTP_BODY_BYTES?.trim();
+  if (!raw) return DEFAULT_MAX_HTTP_BODY;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_HTTP_BODY;
+}
+
+export class HttpBodyTooLargeError extends Error {
+  constructor(public readonly limit: number) {
+    super(`request body exceeds ${limit} bytes`);
+    this.name = "HttpBodyTooLargeError";
+  }
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  const limit = maxHttpBodyBytes();
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of req) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+    const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+    total += buf.length;
+    if (total > limit) throw new HttpBodyTooLargeError(limit);
+    chunks.push(buf);
   }
   const text = Buffer.concat(chunks).toString("utf8").trim();
   if (!text) return undefined;

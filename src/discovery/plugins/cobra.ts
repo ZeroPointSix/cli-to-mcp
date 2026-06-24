@@ -7,14 +7,13 @@
  *   Inherited Flags: ...
  *   Core Commands: / Available Commands:
  *
- * Phase 1: reuse the generic section parser (which already understands
- * Commands/Flags/Usage). The cobra plugin's job is mainly to *match* cobra
- * output with high confidence so users can name it explicitly via
- * `discovery.parser: cobra`.
+ * Parsing uses dedicated table/section logic (cobra-parse). For unrecognized
+ * layouts, falls back to genericPlugin.
  */
 import type { DiscoveredCommand } from "../types.js";
 import type { HelpParserContext, HelpParserPlugin } from "../parser-registry.js";
 import { genericPlugin } from "./generic.js";
+import { parseCobraHelp } from "./cobra-parse.js";
 
 export const cobraPlugin: HelpParserPlugin = {
   id: "cobra",
@@ -28,8 +27,10 @@ export const cobraPlugin: HelpParserPlugin = {
     return 0;
   },
   parse(ctx: HelpParserContext): DiscoveredCommand {
-    // Phase 1: delegate to generic. A dedicated cobra parser can be added
-    // later without changing the registry contract.
+    const parsed = parseCobraHelp(ctx);
+    if (parsed.subcommands.length > 0 || parsed.args.length > 0 || parsed.usage) {
+      return parsed;
+    }
     return genericPlugin.parse(ctx);
   },
 };

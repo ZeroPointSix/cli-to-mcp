@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -46,6 +46,12 @@ describe("gh demo connector config", () => {
 function writeMockGhConfig(): string {
   // Copy the gh config but override the binary to a mock node script so CI
   // doesn't depend on gh being installed.
+  const skillSrc = fileURLToPath(new URL("../examples/gh/skills/gh-pr.md", import.meta.url));
+  mkdirSync(join(dir, "skills"), { recursive: true });
+  const ghSkillSrc = fileURLToPath(new URL("../examples/gh/skills/gh.md", import.meta.url));
+  writeFileSync(join(dir, "skills", "gh.md"), readFileSync(ghSkillSrc, "utf8"), "utf8");
+  writeFileSync(join(dir, "skills", "gh-pr.md"), readFileSync(skillSrc, "utf8"), "utf8");
+
   const mockScript = join(dir, "mock-gh.js");
   writeFileSync(
     mockScript,
@@ -74,7 +80,7 @@ connectors:
       mode: help
       parser: cobra
     skills:
-      - ${join(dirname(GH_CONFIG), "skills/gh.md").replace(/\\/g, "/")}
+      - ./skills/gh.md
 tools:
   gh_pr_view:
     enabled: true

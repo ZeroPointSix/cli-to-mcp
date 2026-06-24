@@ -5,6 +5,7 @@ import { ConfigLoader } from "../config/config-loader.js";
 import { CacheStore } from "../cache/db.js";
 import { InMemoryToolRegistry } from "../registry/tool-registry.js";
 import { CommandExecutor } from "../executor/command-executor.js";
+import { clearWinBinaryCache } from "../executor/resolve-binary.js";
 import { CliToMcpServer } from "../mcp/server.js";
 import { MetaTools } from "./meta-tools.js";
 import { buildDiscoveryEngine } from "../discovery/engine-factory.js";
@@ -15,6 +16,7 @@ import { startBackgroundDiscovery, } from "./background-discovery.js";
 export async function startRuntime(opts) {
     const log = opts.log ?? ((m) => process.stderr.write(`[cli-to-mcp] ${m}\n`));
     const config = new ConfigLoader().load(opts.config);
+    clearWinBinaryCache();
     log(`loaded config from ${opts.config} (hash=${config.configHash})`);
     const cachePath = opts.cachePath ??
         join(config.configDir, ".cli-to-mcp", "cache.sqlite");

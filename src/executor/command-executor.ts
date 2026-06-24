@@ -9,7 +9,10 @@
  */
 import { spawn } from "node:child_process";
 import type { ToolDefinition } from "../registry/tool-definition.js";
+import { decodeChildOutput } from "./child-output.js";
+import { appendChildOutput, maxChildOutputBytes } from "./output-limit.js";
 import { prepareSpawnCommand } from "./spawn-command.js";
+import { terminateChildProcess } from "./terminate-child.js";
 
 export type ExecuteRequest = {
   tool: ToolDefinition;
@@ -54,7 +57,7 @@ export class CommandExecutor {
     return await new Promise<RawExecutionResult>((resolve) => {
       let child: ReturnType<typeof spawn>;
       try {
-        const spawnCmd = prepareSpawnCommand(argv);
+        const spawnCmd = prepareSpawnCommand(argv, process.platform, env);
         child = spawn(spawnCmd.command, spawnCmd.args, {
           env,
           cwd,
@@ -76,36 +79,41 @@ export class CommandExecutor {
 
       let stdout = "";
       let stderr = "";
+      let stdoutTrunc = false;
+      let stderrTrunc = false;
+      const outMax = maxChildOutputBytes();
       let timedOut = false;
       let timer: NodeJS.Timeout | undefined;
+      let killTimer: NodeJS.Timeout | undefined;
 
       if (timeoutMs !== undefined && timeoutMs > 0) {
         timer = setTimeout(() => {
           timedOut = true;
-          try {
-            child.kill("SIGTERM");
-          } catch {
-            /* ignore */
-          }
-          setTimeout(() => {
-            try {
-              child.kill("SIGKILL");
-            } catch {
-              /* ignore */
-            }
+          terminateChildProcess(process.platform, child, "SIGTERM");
+          killTimer = setTimeout(() => {
+            terminateChildProcess(process.platform, child, "SIGKILL");
           }, 500);
         }, timeoutMs);
       }
 
       child.stdout?.on("data", (d) => {
-        stdout += d.toString();
+        if (stdoutTrunc) return;
+        const chunk = decodeChildOutput(d);
+        const r = appendChildOutput(stdout, chunk, outMax);
+        stdout = r.text;
+        stdoutTrunc = r.truncated;
       });
       child.stderr?.on("data", (d) => {
-        stderr += d.toString();
+        if (stderrTrunc) return;
+        const chunk = decodeChildOutput(d);
+        const r = appendChildOutput(stderr, chunk, outMax);
+        stderr = r.text;
+        stderrTrunc = r.truncated;
       });
 
       child.on("error", (err: NodeJS.ErrnoException) => {
         if (timer) clearTimeout(timer);
+        if (killTimer) clearTimeout(killTimer);
         resolve({
           exitCode: null,
           stdout,
@@ -118,6 +126,7 @@ export class CommandExecutor {
 
       child.on("close", (code, signal) => {
         if (timer) clearTimeout(timer);
+        if (killTimer) clearTimeout(killTimer);
         resolve({
           exitCode: code,
           stdout,

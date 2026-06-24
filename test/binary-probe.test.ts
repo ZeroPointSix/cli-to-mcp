@@ -13,7 +13,14 @@ describe("binary-probe", () => {
   });
 
   it("probeArgv fails for missing binary", async () => {
-    const r = await probeArgv(["definitely-not-a-binary-xyz-12345"], { timeoutMs: 2000 });
+    const missing =
+      process.platform === "win32"
+        ? "C:\\no\\such\\probe-missing-xyz.exe"
+        : "definitely-not-a-binary-xyz-12345";
+    const r = await probeArgv([missing], { timeoutMs: 2000 });
     expect(r.ok).toBe(false);
+    if (process.platform === "win32") {
+      expect(r.exit_code).toBe(null);
+    }
   });
 });

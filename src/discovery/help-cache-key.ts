@@ -6,6 +6,14 @@
 import { createHash } from "node:crypto";
 import type { ResolvedConnector } from "../config/config-loader.js";
 
+function stableEnvRecord(env: Record<string, string> | undefined): Record<string, string> | undefined {
+  if (!env || Object.keys(env).length === 0) return undefined;
+  const sorted = Object.keys(env).sort();
+  const out: Record<string, string> = {};
+  for (const k of sorted) out[k] = env[k]!;
+  return out;
+}
+
 function hashString(s: string): string {
   return createHash("sha256").update(s, "utf8").digest("hex").slice(0, 16);
 }
@@ -17,6 +25,7 @@ export function discoveryFingerprint(connector: ResolvedConnector): string {
     JSON.stringify({
       binary: connector.binary,
       argv_prefix: connector.argv_prefix ?? [],
+      connector_env: stableEnvRecord(connector.env),
       working_dir: connector.working_dir,
       help_argv: d.help_argv ?? ["--help"],
       parser: d.parser,

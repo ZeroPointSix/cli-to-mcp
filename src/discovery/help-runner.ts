@@ -7,7 +7,11 @@
  * - Does not throw on non-zero exit; many CLIs exit 0 for --help, some exit 1.
  */
 import { spawn } from "node:child_process";
+import { decodeChildOutput } from "../executor/child-output.js";
+import { appendChildOutput, maxChildOutputBytes } from "../executor/output-limit.js";
 import { prepareSpawnCommand } from "../executor/spawn-command.js";
+import { terminateChildProcess } from "../executor/terminate-child.js";
+import { recordLastHelpSpawnError } from "./help-spawn-diagnostics.js";
 import { stripAnsi } from "./plugins/generic.js";
 
 export type RunHelpOptions = {
@@ -19,6 +23,8 @@ export type RunHelpOptions = {
   /** Inserted after binary, before subcommand path (connector argv_prefix). */
   argvPrefix?: string[];
   helpArgv?: string[];
+  /** When set, failed/empty help spawns are recorded for doctor(). */
+  connectorName?: string;
 };
 
 export type HelpOutput = {
@@ -27,6 +33,9 @@ export type HelpOutput = {
   /** Which stream the help text came from. */
   source: "stdout" | "stderr";
   timedOut: boolean;
+  /** Set when spawn() throws before the process starts. */
+  spawnError?: string;
+  stderrSnippet?: string;
 };
 
 export async function runHelp(
@@ -50,40 +59,67 @@ export async function runHelp(
         windowsHide: true,
       });
     } catch (err) {
+      const spawnError = String(err);
+      recordHelpFailure(opts, binary, path, spawnError, null, false);
       resolve({
         rawHelp: "",
         exitCode: null,
         source: "stdout",
         timedOut: false,
+        spawnError,
       });
       return;
     }
 
     let stdout = "";
     let stderr = "";
+    let stdoutTrunc = false;
+    let stderrTrunc = false;
+    const outMax = maxChildOutputBytes();
     let timedOut = false;
     let timer: NodeJS.Timeout | undefined;
+    let killTimer: NodeJS.Timeout | undefined;
     if (opts.timeoutMs) {
       timer = setTimeout(() => {
         timedOut = true;
-        try {
-          child.kill("SIGTERM");
-        } catch {
-          /* ignore */
-        }
+        terminateChildProcess(process.platform, child, "SIGTERM");
+        killTimer = setTimeout(() => {
+          terminateChildProcess(process.platform, child, "SIGKILL");
+        }, 500);
       }, opts.timeoutMs);
     }
 
-    child.stdout?.on("data", (d) => (stdout += d.toString()));
-    child.stderr?.on("data", (d) => (stderr += d.toString()));
+    child.stdout?.on("data", (d) => {
+      if (stdoutTrunc) return;
+      const r = appendChildOutput(stdout, decodeChildOutput(d), outMax);
+      stdout = r.text;
+      stdoutTrunc = r.truncated;
+    });
+    child.stderr?.on("data", (d) => {
+      if (stderrTrunc) return;
+      const r = appendChildOutput(stderr, decodeChildOutput(d), outMax);
+      stderr = r.text;
+      stderrTrunc = r.truncated;
+    });
 
-    child.on("error", () => {
+    child.on("error", (err) => {
       if (timer) clearTimeout(timer);
-      resolve({ rawHelp: "", exitCode: null, source: "stdout", timedOut });
+      if (killTimer) clearTimeout(killTimer);
+      const spawnError = String(err);
+      recordHelpFailure(opts, binary, path, spawnError, null, timedOut, stderr.trim());
+      resolve({
+        rawHelp: "",
+        exitCode: null,
+        source: "stdout",
+        timedOut,
+        spawnError,
+        stderrSnippet: stderr.trim().slice(0, 300),
+      });
     });
 
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       const fromStdout = stdout.trim();
       const fromStderr = stderr.trim();
       if (fromStdout) {
@@ -91,8 +127,39 @@ export async function runHelp(
       } else if (fromStderr) {
         resolve({ rawHelp: stripAnsi(fromStderr), exitCode: code, source: "stderr", timedOut });
       } else {
-        resolve({ rawHelp: "", exitCode: code, source: "stdout", timedOut });
+        const message = timedOut
+          ? "help subprocess timed out with no output"
+          : "help subprocess produced no stdout/stderr";
+        recordHelpFailure(opts, binary, path, message, code, timedOut, fromStderr);
+        resolve({
+          rawHelp: "",
+          exitCode: code,
+          source: "stdout",
+          timedOut,
+          stderrSnippet: fromStderr.slice(0, 300) || undefined,
+        });
       }
     });
+  });
+}
+
+function recordHelpFailure(
+  opts: RunHelpOptions,
+  binary: string,
+  path: string[],
+  message: string,
+  exitCode: number | null,
+  timedOut: boolean,
+  stderrSnippet?: string,
+): void {
+  if (!opts.connectorName) return;
+  recordLastHelpSpawnError({
+    connector_name: opts.connectorName,
+    binary,
+    path: [...path],
+    message,
+    exit_code: exitCode,
+    timed_out: timedOut,
+    stderr_snippet: stderrSnippet?.slice(0, 300),
   });
 }

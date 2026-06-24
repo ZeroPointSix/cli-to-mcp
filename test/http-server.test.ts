@@ -322,4 +322,101 @@ tools:
     expect(list.status).toBe(200);
     expect(list.body.result.tools.length).toBeGreaterThan(0);
   });
+
+  it("GET /health returns ok without MCP session", async () => {
+    port = 18795;
+    const cfgPath = writeConfig(`
+version: 1
+connectors:
+  - name: mock
+    binary: node
+    enabled: true
+tools:
+  mock_echo:
+    enabled: true
+    connector: mock
+    command: ["-e", "console.log(1)"]
+    description: x
+`);
+    runtime = await startRuntime({
+      host: "127.0.0.1",
+      port,
+      config: cfgPath,
+      cachePath: join(dir, "cache.sqlite"),
+      log: () => {},
+    });
+    const res = await fetch(`http://127.0.0.1:${port}/health`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("ok");
+    expect(body.mcp_auth).toBe(false);
+  });
+
+  it("rejects /mcp without bearer when CLI_TO_MCP_HTTP_BEARER_TOKEN is set", async () => {
+    const prev = process.env.CLI_TO_MCP_HTTP_BEARER_TOKEN;
+    process.env.CLI_TO_MCP_HTTP_BEARER_TOKEN = "test-secret-token";
+    try {
+      port = 18796;
+      const cfgPath = writeConfig(`
+version: 1
+connectors:
+  - name: mock
+    binary: node
+    enabled: true
+tools:
+  mock_echo:
+    enabled: true
+    connector: mock
+    command: ["-e", "console.log(1)"]
+    description: x
+`);
+      runtime = await startRuntime({
+        host: "127.0.0.1",
+        port,
+        config: cfgPath,
+        cachePath: join(dir, "cache.sqlite"),
+        log: () => {},
+      });
+      const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "t", version: "0" },
+          },
+          id: 1,
+        }),
+      });
+      expect(res.status).toBe(401);
+      const bad = await res.json();
+      expect(bad.error).toBe("authentication_required");
+
+      const ok = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-secret-token",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "t", version: "0" },
+          },
+          id: 1,
+        }),
+      });
+      expect(ok.status).toBe(200);
+    } finally {
+      if (prev !== undefined) process.env.CLI_TO_MCP_HTTP_BEARER_TOKEN = prev;
+      else delete process.env.CLI_TO_MCP_HTTP_BEARER_TOKEN;
+    }
+  });
 });

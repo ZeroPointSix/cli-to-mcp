@@ -7,6 +7,15 @@
 - **Node.js ≥ 22**（使用实验性 SQLite 缓存）
 - 本机已安装并可在 PATH 中调用的 CLI（如 `git`、`gh`）
 
+### Windows 建议
+
+- 终端使用 **UTF-8**：`chcp 65001`，并尽量在「Beta: 使用 Unicode UTF-8」区域设置下运行，避免 help/CLI 输出乱码。
+- 若 `doctor` 中 `executor_probe.ok` 为 false 且 `where` 找不到 CLI（常见于 **Azure CLI `az`**），请在 `cli-to-mcp.yaml` 里写 **`binary` 全路径**，例如：
+  ```yaml
+  binary: "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd"
+  ```
+- 可选环境变量 `CLI_TO_MCP_OUTPUT_ENCODING=latin1`：在控制台仍为旧代码页且 UTF-8 解码异常时，强制按字节解释子进程输出。
+
 ## 快速开始
 
 ### 1. 安装
@@ -51,9 +60,29 @@ cli-to-mcp serve \
   --config ./cli-to-mcp.yaml
 ```
 
-MCP 端点：**`http://127.0.0.1:28989/mcp`**
+MCP 端点：**`http://127.0.0.1:28989/mcp`**（Streamable HTTP，与 [MetaMCP](https://github.com/ZeroPointSix/metamcp-chatgpt) 等业务网关同协议）
 
-在 MCP 客户端中配置上述 URL（Streamable HTTP）。
+健康检查（无需鉴权）：**`GET /health`**
+
+在 MCP 客户端中配置上述 URL；`Accept` 需包含 `application/json` 与 `text/event-stream`（多数 SDK 已带；否则服务端会自动补齐）。
+
+### 与 MetaMCP 网关配合
+
+- 本进程负责 **本机 CLI → MCP tools**；MetaMCP 负责 **聚合多个 MCP、门面工具（`search_tools` / `list_tools_by_category`）与 API Key**。
+- 典型拓扑：`Claude Code` → `metamcp-local`（HTTP）→ 命名空间内配置的 **cli-to-mcp** URL。
+- 若将 `cli-to-mcp` 直接暴露到局域网/公网（`--host 0.0.0.0`），请设置共享密钥（对齐 Admin MCP 的 Bearer 模式）：
+
+```bash
+export CLI_TO_MCP_HTTP_BEARER_TOKEN="your-long-random-secret"
+cli-to-mcp serve --host 0.0.0.0 --port 28989 --config ./cli-to-mcp.yaml
+```
+
+客户端请求头任选其一：
+
+- `Authorization: Bearer <CLI_TO_MCP_HTTP_BEARER_TOKEN>`
+- `X-CLI-To-MCP-Secret: <CLI_TO_MCP_HTTP_BEARER_TOKEN>`
+
+`GET /health` 始终无需 Token，便于探活。
 
 ### 4. 元工具
 

@@ -1,5 +1,5 @@
-const COMMAND_SECTION = /^(commands|subcommands|available commands|core commands|subgroups):?\s*$/i;
-const OPTIONS_SECTION = /^(options|flags|global flags|global options|arguments|global arguments):?\s*$/i;
+const COMMAND_SECTION = /^(commands|subcommands|available commands|core commands|additional commands|command list|subgroups):?\s*$/i;
+const OPTIONS_SECTION = /^(options|flags|global flags|global options|arguments|global arguments|local flags|inherited flags|parameters):?\s*$/i;
 const USAGE_LINE = /^usage:?\s*/i;
 export function stripAnsi(s) {
     // Strip common ANSI color / cursor escapes.
@@ -42,11 +42,12 @@ export const genericPlugin = {
                 continue;
             }
             if (section === "commands") {
-                const m = trimmed.match(/^([a-z][\w-]*):?\s+(.+)$/i) ?? trimmed.match(/^([a-z][\w-]*)\s{2,}(.+)$/i);
+                const m = trimmed.match(/^([a-zA-Z][\w.-]*):?\s+(.+)$/) ??
+                    trimmed.match(/^([a-zA-Z][\w.-]+)\s{2,}(.+)$/);
                 if (m) {
                     subcommands.push(m[1]);
                 }
-                else if (/^[a-z][\w-]*$/i.test(trimmed)) {
+                else if (/^[a-zA-Z][\w.-]*$/.test(trimmed)) {
                     subcommands.push(trimmed);
                 }
                 continue;

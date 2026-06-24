@@ -5,6 +5,7 @@ import { ConfigLoader, type LoadedConfig } from "../config/config-loader.js";
 import { CacheStore } from "../cache/db.js";
 import { InMemoryToolRegistry } from "../registry/tool-registry.js";
 import { CommandExecutor } from "../executor/command-executor.js";
+import { clearWinBinaryCache } from "../executor/resolve-binary.js";
 import { CliToMcpServer } from "../mcp/server.js";
 import { MetaTools, type MetaToolHandlers } from "./meta-tools.js";
 import { buildDiscoveryEngine } from "../discovery/engine-factory.js";
@@ -45,6 +46,7 @@ export async function startRuntime(opts: ServeOptions): Promise<Runtime> {
   const log = opts.log ?? ((m: string) => process.stderr.write(`[cli-to-mcp] ${m}\n`));
 
   const config = new ConfigLoader().load(opts.config);
+  clearWinBinaryCache();
   log(`loaded config from ${opts.config} (hash=${config.configHash})`);
 
   const cachePath =

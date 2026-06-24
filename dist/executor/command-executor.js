@@ -8,7 +8,10 @@
  * - Honor cwd, timeout, capture stdout/stderr/exitCode/duration.
  */
 import { spawn } from "node:child_process";
+import { decodeChildOutput } from "./child-output.js";
+import { appendChildOutput, maxChildOutputBytes } from "./output-limit.js";
 import { prepareSpawnCommand } from "./spawn-command.js";
+import { terminateChildProcess } from "./terminate-child.js";
 export class CommandExecutor {
     baseEnv;
     constructor(opts = {}) {
@@ -24,7 +27,7 @@ export class CommandExecutor {
         return await new Promise((resolve) => {
             let child;
             try {
-                const spawnCmd = prepareSpawnCommand(argv);
+                const spawnCmd = prepareSpawnCommand(argv, process.platform, env);
                 child = spawn(spawnCmd.command, spawnCmd.args, {
                     env,
                     cwd,
@@ -46,36 +49,42 @@ export class CommandExecutor {
             }
             let stdout = "";
             let stderr = "";
+            let stdoutTrunc = false;
+            let stderrTrunc = false;
+            const outMax = maxChildOutputBytes();
             let timedOut = false;
             let timer;
+            let killTimer;
             if (timeoutMs !== undefined && timeoutMs > 0) {
                 timer = setTimeout(() => {
                     timedOut = true;
-                    try {
-                        child.kill("SIGTERM");
-                    }
-                    catch {
-                        /* ignore */
-                    }
-                    setTimeout(() => {
-                        try {
-                            child.kill("SIGKILL");
-                        }
-                        catch {
-                            /* ignore */
-                        }
+                    terminateChildProcess(process.platform, child, "SIGTERM");
+                    killTimer = setTimeout(() => {
+                        terminateChildProcess(process.platform, child, "SIGKILL");
                     }, 500);
                 }, timeoutMs);
             }
             child.stdout?.on("data", (d) => {
-                stdout += d.toString();
+                if (stdoutTrunc)
+                    return;
+                const chunk = decodeChildOutput(d);
+                const r = appendChildOutput(stdout, chunk, outMax);
+                stdout = r.text;
+                stdoutTrunc = r.truncated;
             });
             child.stderr?.on("data", (d) => {
-                stderr += d.toString();
+                if (stderrTrunc)
+                    return;
+                const chunk = decodeChildOutput(d);
+                const r = appendChildOutput(stderr, chunk, outMax);
+                stderr = r.text;
+                stderrTrunc = r.truncated;
             });
             child.on("error", (err) => {
                 if (timer)
                     clearTimeout(timer);
+                if (killTimer)
+                    clearTimeout(killTimer);
                 resolve({
                     exitCode: null,
                     stdout,
@@ -88,6 +97,8 @@ export class CommandExecutor {
             child.on("close", (code, signal) => {
                 if (timer)
                     clearTimeout(timer);
+                if (killTimer)
+                    clearTimeout(killTimer);
                 resolve({
                     exitCode: code,
                     stdout,
