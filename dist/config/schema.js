@@ -26,6 +26,13 @@ export const DiscoveryConfig = z.object({
     /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
     template: z.string().optional(),
     include_subgroups: z.array(z.string()).optional(),
+    /**
+     * Cold-start scope limiter: when startup_budget_seconds is set, only these
+     * top-level subcommands are scanned during cold start (fast partial serve).
+     * Background continuation then scans the full tree. Falls back to
+     * include_subgroups (or full scan) when unset.
+     */
+    startup_include_subgroups: z.array(z.string()).optional(),
     help_argv: z.array(z.string()).min(1).optional(),
     materialize_global_args: z.boolean().optional(),
     global_arg_allowlist: z.array(z.string()).optional(),
@@ -36,10 +43,23 @@ export const DiscoveryConfig = z.object({
     /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
     startup_budget_seconds: z.number().int().positive().max(3600).optional(),
     /**
+     * Cold-start depth cap: discover only this many levels before the server starts,
+     * then continue to max_depth in the background. Only applies when
+     * startup_budget_seconds is set. Lets cold start register shallow tools fast
+     * while deeper levels are filled in by background_continue_discovery.
+     */
+    startup_max_depth: z.number().int().positive().max(10).optional(),
+    /**
      * After budget-limited startup, continue help discovery in the background (default true when budget is set).
      * Set false to only use refresh_tools manually.
      */
     background_continue_discovery: z.boolean().optional(),
+    /**
+     * Concurrency for background continuation (defaults to discovery.concurrency).
+     * Set higher than cold-start concurrency to finish full registration faster
+     * once the server is already serving.
+     */
+    background_concurrency: z.number().int().positive().max(64).optional(),
     exposure_mode: z.enum(["flat", "lazy"]).optional(),
 });
 export const ConnectorConfig = z.object({

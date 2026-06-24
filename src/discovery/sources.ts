@@ -190,16 +190,35 @@ export class HelpSource implements DiscoverySource {
     const discoverT0 = Date.now();
 
     /** Default 5: recurse help tree up to 5 command segments; deeper paths are not scanned (ADR 0006). */
-    const maxDepth = connector.discovery?.max_depth ?? 5;
-    this.log(`help discovery: ${connector.name} max_depth=${maxDepth}`);
+    const fullMaxDepth = connector.discovery?.max_depth ?? 5;
     const parserId = connector.discovery?.parser;
     const helpTimeoutMs =
       (connector.help_timeout_seconds ?? connector.default_timeout_seconds ?? 25) * 1000;
     const includeSubgroups = connector.discovery?.include_subgroups;
+    const startupIncludeSubgroups = connector.discovery?.startup_include_subgroups;
 
     const startupBudgetMs = connector.discovery?.startup_budget_seconds
       ? connector.discovery.startup_budget_seconds * 1000
       : undefined;
+
+    // During budgeted cold start, optionally limit scope to startup_include_subgroups
+    // for a fast partial serve; background continuation scans the full tree.
+    const effectiveIncludeSubgroups =
+      startupBudgetMs != null && startupIncludeSubgroups != null
+        ? startupIncludeSubgroups
+        : includeSubgroups;
+
+    // During budgeted cold start, cap depth at startup_max_depth so the server
+    // can register shallow tools fast; background continuation fills deeper
+    // levels up to fullMaxDepth.
+    const startupMaxDepth = connector.discovery?.startup_max_depth;
+    const maxDepth =
+      startupBudgetMs != null && startupMaxDepth != null
+        ? Math.min(fullMaxDepth, startupMaxDepth)
+        : fullMaxDepth;
+    this.log(
+      `help discovery: ${connector.name} max_depth=${maxDepth}${startupMaxDepth != null && startupBudgetMs != null ? ` (startup_cap=${startupMaxDepth} full=${fullMaxDepth})` : ""}`,
+    );
 
     const concurrency =
       connector.discovery?.concurrency ?? (startupBudgetMs != null ? 24 : 16);
@@ -218,7 +237,7 @@ export class HelpSource implements DiscoverySource {
     const nodes = await scanHelpTree({
       connector,
       maxDepth,
-      includeSubgroups,
+      includeSubgroups: effectiveIncludeSubgroups,
       parserId,
       helpTimeoutMs,
       concurrency,

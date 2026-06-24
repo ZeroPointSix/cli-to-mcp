@@ -45,6 +45,13 @@ export declare const DiscoveryConfig: z.ZodObject<{
     /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
     template: z.ZodOptional<z.ZodString>;
     include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    /**
+     * Cold-start scope limiter: when startup_budget_seconds is set, only these
+     * top-level subcommands are scanned during cold start (fast partial serve).
+     * Background continuation then scans the full tree. Falls back to
+     * include_subgroups (or full scan) when unset.
+     */
+    startup_include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     help_argv: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     materialize_global_args: z.ZodOptional<z.ZodBoolean>;
     global_arg_allowlist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
@@ -55,10 +62,23 @@ export declare const DiscoveryConfig: z.ZodObject<{
     /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
     startup_budget_seconds: z.ZodOptional<z.ZodNumber>;
     /**
+     * Cold-start depth cap: discover only this many levels before the server starts,
+     * then continue to max_depth in the background. Only applies when
+     * startup_budget_seconds is set. Lets cold start register shallow tools fast
+     * while deeper levels are filled in by background_continue_discovery.
+     */
+    startup_max_depth: z.ZodOptional<z.ZodNumber>;
+    /**
      * After budget-limited startup, continue help discovery in the background (default true when budget is set).
      * Set false to only use refresh_tools manually.
      */
     background_continue_discovery: z.ZodOptional<z.ZodBoolean>;
+    /**
+     * Concurrency for background continuation (defaults to discovery.concurrency).
+     * Set higher than cold-start concurrency to finish full registration faster
+     * once the server is already serving.
+     */
+    background_concurrency: z.ZodOptional<z.ZodNumber>;
     exposure_mode: z.ZodOptional<z.ZodEnum<["flat", "lazy"]>>;
 }, "strip", z.ZodTypeAny, {
     mode: "help" | "manual" | "none";
@@ -67,6 +87,7 @@ export declare const DiscoveryConfig: z.ZodObject<{
     parser_module?: string | undefined;
     template?: string | undefined;
     include_subgroups?: string[] | undefined;
+    startup_include_subgroups?: string[] | undefined;
     help_argv?: string[] | undefined;
     materialize_global_args?: boolean | undefined;
     global_arg_allowlist?: string[] | undefined;
@@ -74,7 +95,9 @@ export declare const DiscoveryConfig: z.ZodObject<{
     concurrency?: number | undefined;
     bfs_preference?: "fifo" | "shallow_first" | undefined;
     startup_budget_seconds?: number | undefined;
+    startup_max_depth?: number | undefined;
     background_continue_discovery?: boolean | undefined;
+    background_concurrency?: number | undefined;
     exposure_mode?: "flat" | "lazy" | undefined;
 }, {
     mode?: "help" | "manual" | "none" | undefined;
@@ -83,6 +106,7 @@ export declare const DiscoveryConfig: z.ZodObject<{
     parser_module?: string | undefined;
     template?: string | undefined;
     include_subgroups?: string[] | undefined;
+    startup_include_subgroups?: string[] | undefined;
     help_argv?: string[] | undefined;
     materialize_global_args?: boolean | undefined;
     global_arg_allowlist?: string[] | undefined;
@@ -90,7 +114,9 @@ export declare const DiscoveryConfig: z.ZodObject<{
     concurrency?: number | undefined;
     bfs_preference?: "fifo" | "shallow_first" | undefined;
     startup_budget_seconds?: number | undefined;
+    startup_max_depth?: number | undefined;
     background_continue_discovery?: boolean | undefined;
+    background_concurrency?: number | undefined;
     exposure_mode?: "flat" | "lazy" | undefined;
 }>;
 export type DiscoveryConfig = z.infer<typeof DiscoveryConfig>;
@@ -114,6 +140,13 @@ export declare const ConnectorConfig: z.ZodObject<{
         /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
         template: z.ZodOptional<z.ZodString>;
         include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        /**
+         * Cold-start scope limiter: when startup_budget_seconds is set, only these
+         * top-level subcommands are scanned during cold start (fast partial serve).
+         * Background continuation then scans the full tree. Falls back to
+         * include_subgroups (or full scan) when unset.
+         */
+        startup_include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         help_argv: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         materialize_global_args: z.ZodOptional<z.ZodBoolean>;
         global_arg_allowlist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
@@ -124,10 +157,23 @@ export declare const ConnectorConfig: z.ZodObject<{
         /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
         startup_budget_seconds: z.ZodOptional<z.ZodNumber>;
         /**
+         * Cold-start depth cap: discover only this many levels before the server starts,
+         * then continue to max_depth in the background. Only applies when
+         * startup_budget_seconds is set. Lets cold start register shallow tools fast
+         * while deeper levels are filled in by background_continue_discovery.
+         */
+        startup_max_depth: z.ZodOptional<z.ZodNumber>;
+        /**
          * After budget-limited startup, continue help discovery in the background (default true when budget is set).
          * Set false to only use refresh_tools manually.
          */
         background_continue_discovery: z.ZodOptional<z.ZodBoolean>;
+        /**
+         * Concurrency for background continuation (defaults to discovery.concurrency).
+         * Set higher than cold-start concurrency to finish full registration faster
+         * once the server is already serving.
+         */
+        background_concurrency: z.ZodOptional<z.ZodNumber>;
         exposure_mode: z.ZodOptional<z.ZodEnum<["flat", "lazy"]>>;
     }, "strip", z.ZodTypeAny, {
         mode: "help" | "manual" | "none";
@@ -136,6 +182,7 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        startup_include_subgroups?: string[] | undefined;
         help_argv?: string[] | undefined;
         materialize_global_args?: boolean | undefined;
         global_arg_allowlist?: string[] | undefined;
@@ -143,7 +190,9 @@ export declare const ConnectorConfig: z.ZodObject<{
         concurrency?: number | undefined;
         bfs_preference?: "fifo" | "shallow_first" | undefined;
         startup_budget_seconds?: number | undefined;
+        startup_max_depth?: number | undefined;
         background_continue_discovery?: boolean | undefined;
+        background_concurrency?: number | undefined;
         exposure_mode?: "flat" | "lazy" | undefined;
     }, {
         mode?: "help" | "manual" | "none" | undefined;
@@ -152,6 +201,7 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        startup_include_subgroups?: string[] | undefined;
         help_argv?: string[] | undefined;
         materialize_global_args?: boolean | undefined;
         global_arg_allowlist?: string[] | undefined;
@@ -159,7 +209,9 @@ export declare const ConnectorConfig: z.ZodObject<{
         concurrency?: number | undefined;
         bfs_preference?: "fifo" | "shallow_first" | undefined;
         startup_budget_seconds?: number | undefined;
+        startup_max_depth?: number | undefined;
         background_continue_discovery?: boolean | undefined;
+        background_concurrency?: number | undefined;
         exposure_mode?: "flat" | "lazy" | undefined;
     }>>;
     /** Directory of skill files; paths relative to config file directory. */
@@ -181,6 +233,7 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        startup_include_subgroups?: string[] | undefined;
         help_argv?: string[] | undefined;
         materialize_global_args?: boolean | undefined;
         global_arg_allowlist?: string[] | undefined;
@@ -188,7 +241,9 @@ export declare const ConnectorConfig: z.ZodObject<{
         concurrency?: number | undefined;
         bfs_preference?: "fifo" | "shallow_first" | undefined;
         startup_budget_seconds?: number | undefined;
+        startup_max_depth?: number | undefined;
         background_continue_discovery?: boolean | undefined;
+        background_concurrency?: number | undefined;
         exposure_mode?: "flat" | "lazy" | undefined;
     } | undefined;
     skill_root?: string | undefined;
@@ -209,6 +264,7 @@ export declare const ConnectorConfig: z.ZodObject<{
         parser_module?: string | undefined;
         template?: string | undefined;
         include_subgroups?: string[] | undefined;
+        startup_include_subgroups?: string[] | undefined;
         help_argv?: string[] | undefined;
         materialize_global_args?: boolean | undefined;
         global_arg_allowlist?: string[] | undefined;
@@ -216,7 +272,9 @@ export declare const ConnectorConfig: z.ZodObject<{
         concurrency?: number | undefined;
         bfs_preference?: "fifo" | "shallow_first" | undefined;
         startup_budget_seconds?: number | undefined;
+        startup_max_depth?: number | undefined;
         background_continue_discovery?: boolean | undefined;
+        background_concurrency?: number | undefined;
         exposure_mode?: "flat" | "lazy" | undefined;
     } | undefined;
     skill_root?: string | undefined;
@@ -340,6 +398,13 @@ export declare const Config: z.ZodObject<{
             /** Explicit connector template id, e.g. "gh". Overrides auto-match by name. */
             template: z.ZodOptional<z.ZodString>;
             include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+            /**
+             * Cold-start scope limiter: when startup_budget_seconds is set, only these
+             * top-level subcommands are scanned during cold start (fast partial serve).
+             * Background continuation then scans the full tree. Falls back to
+             * include_subgroups (or full scan) when unset.
+             */
+            startup_include_subgroups: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
             help_argv: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
             materialize_global_args: z.ZodOptional<z.ZodBoolean>;
             global_arg_allowlist: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
@@ -350,10 +415,23 @@ export declare const Config: z.ZodObject<{
             /** Stop expanding the help BFS after this many seconds (in-flight nodes still finish). */
             startup_budget_seconds: z.ZodOptional<z.ZodNumber>;
             /**
+             * Cold-start depth cap: discover only this many levels before the server starts,
+             * then continue to max_depth in the background. Only applies when
+             * startup_budget_seconds is set. Lets cold start register shallow tools fast
+             * while deeper levels are filled in by background_continue_discovery.
+             */
+            startup_max_depth: z.ZodOptional<z.ZodNumber>;
+            /**
              * After budget-limited startup, continue help discovery in the background (default true when budget is set).
              * Set false to only use refresh_tools manually.
              */
             background_continue_discovery: z.ZodOptional<z.ZodBoolean>;
+            /**
+             * Concurrency for background continuation (defaults to discovery.concurrency).
+             * Set higher than cold-start concurrency to finish full registration faster
+             * once the server is already serving.
+             */
+            background_concurrency: z.ZodOptional<z.ZodNumber>;
             exposure_mode: z.ZodOptional<z.ZodEnum<["flat", "lazy"]>>;
         }, "strip", z.ZodTypeAny, {
             mode: "help" | "manual" | "none";
@@ -362,6 +440,7 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            startup_include_subgroups?: string[] | undefined;
             help_argv?: string[] | undefined;
             materialize_global_args?: boolean | undefined;
             global_arg_allowlist?: string[] | undefined;
@@ -369,7 +448,9 @@ export declare const Config: z.ZodObject<{
             concurrency?: number | undefined;
             bfs_preference?: "fifo" | "shallow_first" | undefined;
             startup_budget_seconds?: number | undefined;
+            startup_max_depth?: number | undefined;
             background_continue_discovery?: boolean | undefined;
+            background_concurrency?: number | undefined;
             exposure_mode?: "flat" | "lazy" | undefined;
         }, {
             mode?: "help" | "manual" | "none" | undefined;
@@ -378,6 +459,7 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            startup_include_subgroups?: string[] | undefined;
             help_argv?: string[] | undefined;
             materialize_global_args?: boolean | undefined;
             global_arg_allowlist?: string[] | undefined;
@@ -385,7 +467,9 @@ export declare const Config: z.ZodObject<{
             concurrency?: number | undefined;
             bfs_preference?: "fifo" | "shallow_first" | undefined;
             startup_budget_seconds?: number | undefined;
+            startup_max_depth?: number | undefined;
             background_continue_discovery?: boolean | undefined;
+            background_concurrency?: number | undefined;
             exposure_mode?: "flat" | "lazy" | undefined;
         }>>;
         /** Directory of skill files; paths relative to config file directory. */
@@ -407,6 +491,7 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            startup_include_subgroups?: string[] | undefined;
             help_argv?: string[] | undefined;
             materialize_global_args?: boolean | undefined;
             global_arg_allowlist?: string[] | undefined;
@@ -414,7 +499,9 @@ export declare const Config: z.ZodObject<{
             concurrency?: number | undefined;
             bfs_preference?: "fifo" | "shallow_first" | undefined;
             startup_budget_seconds?: number | undefined;
+            startup_max_depth?: number | undefined;
             background_continue_discovery?: boolean | undefined;
+            background_concurrency?: number | undefined;
             exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
@@ -435,6 +522,7 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            startup_include_subgroups?: string[] | undefined;
             help_argv?: string[] | undefined;
             materialize_global_args?: boolean | undefined;
             global_arg_allowlist?: string[] | undefined;
@@ -442,7 +530,9 @@ export declare const Config: z.ZodObject<{
             concurrency?: number | undefined;
             bfs_preference?: "fifo" | "shallow_first" | undefined;
             startup_budget_seconds?: number | undefined;
+            startup_max_depth?: number | undefined;
             background_continue_discovery?: boolean | undefined;
+            background_concurrency?: number | undefined;
             exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
@@ -560,6 +650,7 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            startup_include_subgroups?: string[] | undefined;
             help_argv?: string[] | undefined;
             materialize_global_args?: boolean | undefined;
             global_arg_allowlist?: string[] | undefined;
@@ -567,7 +658,9 @@ export declare const Config: z.ZodObject<{
             concurrency?: number | undefined;
             bfs_preference?: "fifo" | "shallow_first" | undefined;
             startup_budget_seconds?: number | undefined;
+            startup_max_depth?: number | undefined;
             background_continue_discovery?: boolean | undefined;
+            background_concurrency?: number | undefined;
             exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;
@@ -616,6 +709,7 @@ export declare const Config: z.ZodObject<{
             parser_module?: string | undefined;
             template?: string | undefined;
             include_subgroups?: string[] | undefined;
+            startup_include_subgroups?: string[] | undefined;
             help_argv?: string[] | undefined;
             materialize_global_args?: boolean | undefined;
             global_arg_allowlist?: string[] | undefined;
@@ -623,7 +717,9 @@ export declare const Config: z.ZodObject<{
             concurrency?: number | undefined;
             bfs_preference?: "fifo" | "shallow_first" | undefined;
             startup_budget_seconds?: number | undefined;
+            startup_max_depth?: number | undefined;
             background_continue_discovery?: boolean | undefined;
+            background_concurrency?: number | undefined;
             exposure_mode?: "flat" | "lazy" | undefined;
         } | undefined;
         skill_root?: string | undefined;

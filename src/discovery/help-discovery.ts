@@ -255,14 +255,40 @@ export async function scanHelpTree(opts: ScanHelpTreeOptions): Promise<HelpNodeR
   if (budgetTimer) clearTimeout(budgetTimer);
   if (hardWallTimer) clearTimeout(hardWallTimer);
 
+  const cacheHits = results.filter((r) => r.helpFromCache).length;
+  const spawnedCount = session?.pendingWrites.length ?? results.length;
+
   if (session && session.pendingWrites.length > 0 && cache) {
     cache.putHelpCacheBatch(session.pendingWrites);
+    session.pendingWrites = [];
   }
-  const cacheHits = results.filter((r) => r.helpFromCache).length;
-  const spawned = session?.pendingWrites.length ?? results.length;
+
+  // Detached drain: when the hard wall fires, in-flight help spawns are still
+  // running and their results land in session.pendingWrites AFTER the flush
+  // above. Drain them to help_cache so background continuation doesn't have to
+  // re-spawn those nodes. Fire-and-forget — errors are non-fatal (cache may be
+  // closed by runtime.stop() before the drain settles).
+  if (session && cache && budgetClosed) {
+    const drainHelpCache = (async () => {
+      const graceDeadline = Date.now() + Math.min(opts.helpTimeoutMs + 5_000, 30_000);
+      while (active > 0 && Date.now() < graceDeadline) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (session!.pendingWrites.length > 0) {
+        const n = session!.pendingWrites.length;
+        cache.putHelpCacheBatch(session!.pendingWrites);
+        session!.pendingWrites = [];
+        log(
+          `help discovery: ${connector.name} drain_after_hard_wall flushed=${n} active_left=${active}`,
+        );
+      }
+    })();
+    drainHelpCache.catch(() => {});
+  }
+
   const queuedLeft = Math.max(0, tail - head);
   log(
-    `help discovery: ${connector.name} done nodes=${results.length} spawned=${spawned} cache_hits=${cacheHits} pool=${pool}${budgetClosed ? ` budget_truncated queued_left=${queuedLeft}` : ""}`,
+    `help discovery: ${connector.name} done nodes=${results.length} spawned=${spawnedCount} cache_hits=${cacheHits} pool=${pool}${budgetClosed ? ` budget_truncated queued_left=${queuedLeft}` : ""}`,
   );
 
   return results;

@@ -1,6 +1,19 @@
 # Issue #15 示例：Azure CLI（az）大连接器
 # 演示 help 树发现、并发扫描、lazy 暴露、全局参数过滤与可选 argv_prefix。
+#
+# 冷启动策略（目标：5 分钟内 serve 且尽快全量注册）：
+#   1. startup_max_depth: 2  → 冷启动只扫到 2 层（root + 一级 + 二级叶子），
+#      约 1 分钟内注册数百个常用工具即可 serve；
+#   2. startup_budget_seconds: 300 → 5 分钟硬墙兜底，保证 server 必起；
+#   3. background_continue_discovery: true → 后台继续扫到 max_depth: 3 全量；
+#   4. background_concurrency: 32 → 后台用更高并发，快速补齐全量工具；
+#   5. help_cache（SQLite）跨重启复用，二次冷启动几乎零 spawn。
 version: 1
+
+runtime:
+  # 进程级并发硬墙：单 connector 的并发 + 后台并发总上限不超过此值。
+  max_inflight_help_spawns: 32
+  parallel_connector_discovery: true
 
 connectors:
   - name: az
@@ -14,22 +27,41 @@ connectors:
     env:
       AZURE_CORE_COLLECT_TELEMETRY: "false"
       AZURE_CORE_DISABLE_TELEMETRY: "true"
+      # 降低每次 `az -h` 的 Python 启动开销
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONNOUSERSITE: "1"
+      PYTHONUNBUFFERED: "1"
     discovery:
       mode: help
       parser: generic
       # 自定义解析器（需先实现并导出 plugin）：
       # parser_module: ./parsers/az-parser.mjs
       max_depth: 3
-      # 约 5 分钟内先 serve；后台继续发现并增量合并工具（doctor.background_discovery）
-      startup_budget_seconds: 300
-      background_continue_discovery: true
-      # 仅扫描这些一级子命令，缩短首次发现时间（示例；可按需增删）
-      include_subgroups:
+      # 冷启动只扫到 2 层：快速注册常用叶子工具（account/group/appservice 等的二级命令）
+      startup_max_depth: 2
+      # 冷启动只扫这些常用一级分组（~150 个节点，3-4 分钟内完成 serve）；
+      # 后台继续扫全部分组 + max_depth=3 补齐全量工具。
+      # 按需增删：减少分组→更快 serve 但初始工具更少；增加分组→初始工具更多但接近 5 分钟。
+      startup_include_subgroups:
         - account
         - group
+        - vm
+        - storage
+        - network
+        - appservice
+      # 4.5 分钟硬墙兜底：保证 startRuntime 在 270s 内返回（实际 ~4.6 min，留 30s 余量 < 5 min）。
+      # in-flight 不阻塞返回；后台继续发现并把结果合并进 help_cache。
+      startup_budget_seconds: 270
+      background_continue_discovery: true
+      # 后台继续扫到 max_depth=3，用更高并发快速补齐
+      background_concurrency: 32
+      # 冷启动并发：24 在 Windows 上较稳；若 CPU/磁盘充足可调到 32
+      concurrency: 24
+      bfs_preference: shallow_first
+      # 全量扫描所有一级子命令。如需进一步缩短冷启动，可只扫常用分组：
+      # include_subgroups: [account, group, appservice, vm, storage, network]
       # az 常用 -h；也可写 ["--help"] 或与官方一致
       help_argv: ["-h"]
-      concurrency: 16
       exposure_mode: lazy
       # 默认不把 Global Arguments（--help/--debug 等）物化到叶子工具 schema
       materialize_global_args: false

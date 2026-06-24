@@ -10,7 +10,19 @@ import { summarizeSources } from "../discovery/sources.js";
 
 export function connectorWithoutStartupBudget(conn: ResolvedConnector): ResolvedConnector {
   if (!conn.discovery) return conn;
-  const { startup_budget_seconds: _b, ...rest } = conn.discovery;
+  const {
+    startup_budget_seconds: _b,
+    startup_max_depth: _smd,
+    startup_include_subgroups: _sis,
+    background_concurrency: _bgc,
+    ...rest
+  } = conn.discovery;
+  // Background continuation runs with full max_depth (startup cap stripped).
+  // Optionally bump concurrency so full registration finishes faster once the
+  // server is already serving.
+  if (_bgc != null) {
+    rest.concurrency = _bgc;
+  }
   return { ...conn, discovery: rest };
 }
 
