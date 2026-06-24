@@ -87,6 +87,8 @@ export class CliToMcpServer {
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
+          ...(t.annotations ? { annotations: t.annotations } : {}),
+          ...(t.mcpMeta && Object.keys(t.mcpMeta).length > 0 ? { _meta: t.mcpMeta } : {}),
         }));
       const meta = this.opts.metaTools?.list() ?? [];
       for (const m of meta) {

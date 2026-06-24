@@ -110,6 +110,24 @@ describe("buildArgv", () => {
     expect(buildArgv(t, { v: true })).toEqual([NODE, MOCK_CLI, "-v"]);
   });
 
+  it("emits positional args before flags", () => {
+    const t = mkTool({
+      command: ["api"],
+      args: [
+        { name: "method", type: "string", required: true, kind: "positional", position: 0 },
+        { name: "path", type: "string", required: true, kind: "positional", position: 1 },
+        { name: "verbose", type: "boolean", required: false, kind: "flag" },
+      ],
+    });
+    expect(buildArgv(t, { method: "GET", path: "/x", verbose: true })).toEqual([
+      NODE,
+      "api",
+      "GET",
+      "/x",
+      "--verbose",
+    ]);
+  });
+
   it("help-discovered short aliases (-R, -n) must not become ---R / ---n", () => {
     const t = mkTool({
       args: [

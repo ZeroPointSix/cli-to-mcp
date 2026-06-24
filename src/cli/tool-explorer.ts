@@ -107,6 +107,15 @@ export function getToolSchema(registry: ToolRegistry, name: string) {
     command: tool.command,
     inputSchema: tool.inputSchema,
     source: tool.source,
+    ...(tool.annotations ? { annotations: tool.annotations } : {}),
+    ...(tool.mcpMeta && Object.keys(tool.mcpMeta).length > 0 ? { mcpMeta: tool.mcpMeta } : {}),
+    args: tool.args.map((a) => ({
+      name: a.name,
+      type: a.type,
+      required: a.required,
+      kind: a.kind ?? (a.type === "boolean" ? "flag" : "option"),
+      ...(a.position !== undefined ? { position: a.position } : {}),
+    })),
   };
 }
 

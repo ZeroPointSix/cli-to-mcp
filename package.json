@@ -1,6 +1,6 @@
 {
   "name": "cli-to-mcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Expose local CLIs as MCP tools over HTTP (Streamable MCP).",
   "type": "module",
   "license": "MIT",

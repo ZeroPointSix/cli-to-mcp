@@ -10,6 +10,9 @@ import { z } from "zod";
 export const ArgType = z.enum(["string", "integer", "number", "boolean", "array"]);
 export type ArgType = z.infer<typeof ArgType>;
 
+export const ArgKind = z.enum(["flag", "option", "positional"]);
+export type ArgKind = z.infer<typeof ArgKind>;
+
 export const ArgDecl = z.object({
   type: ArgType.default("string"),
   required: z.boolean().default(false),
@@ -18,6 +21,8 @@ export const ArgDecl = z.object({
   enum: z.array(z.string()).optional(),
   aliases: z.array(z.string()).optional(),
   repeatable: z.boolean().optional(),
+  kind: ArgKind.optional(),
+  position: z.number().int().nonnegative().optional(),
 });
 export type ArgDecl = z.infer<typeof ArgDecl>;
 
@@ -89,6 +94,14 @@ export const ConnectorConfig = z.object({
 });
 export type ConnectorConfig = z.infer<typeof ConnectorConfig>;
 
+export const ToolAnnotationsDecl = z.object({
+  title: z.string().optional(),
+  readOnlyHint: z.boolean().optional(),
+  destructiveHint: z.boolean().optional(),
+  idempotentHint: z.boolean().optional(),
+  openWorldHint: z.boolean().optional(),
+});
+
 export const ToolDecl = z.object({
   enabled: z.boolean().default(true),
   connector: z.string().min(1),
@@ -98,6 +111,8 @@ export const ToolDecl = z.object({
   default_args: z.array(z.string()).optional(),
   output: z.object({ format: OutputFormat.default("text") }).optional(),
   skills: z.array(z.string()).optional(),
+  annotations: ToolAnnotationsDecl.optional(),
+  mcp_meta: z.record(z.string(), z.unknown()).optional(),
 });
 export type ToolDecl = z.infer<typeof ToolDecl>;
 

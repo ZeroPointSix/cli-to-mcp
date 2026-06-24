@@ -15,6 +15,8 @@ import type { DiscoveredArg, DiscoveredCommand } from "../discovery/types.js";
 import type { ResolvedConnector } from "../config/config-loader.js";
 import type { ArgType } from "../config/schema.js";
 import { globalArgFilterOpts, shouldMaterializeArg } from "../discovery/global-args.js";
+import { positionalsFromUsage } from "./usage-positionals.js";
+import { applyDescriptionHints } from "./infer-annotations.js";
 
 export function buildToolName(connectorName: string, path: string[]): string {
   const segments = [connectorName, ...path];
@@ -34,18 +36,22 @@ export function toolFromDiscovered(
   if (META_TOOL_NAMES.has(name)) return null;
 
   const filterOpts = globalArgFilterOpts(connector.discovery);
-  const args = cmd.args
-    .filter((a) => shouldMaterializeArg(a, filterOpts, a.fromGlobalSection === true))
-    .map((a) => toToolArg(a));
+  const fromHelp = cmd.args.filter((a) =>
+    shouldMaterializeArg(a, filterOpts, a.fromGlobalSection === true),
+  );
+  const usagePos = positionalsFromUsage(cmd.usage);
+  const mergedDiscovered = mergeDiscoveredArgs(fromHelp, usagePos);
+  const args = mergedDiscovered.map((a) => toToolArg(a));
 
-  const description =
+  const rawDescription =
     cmd.description ??
     cmd.usage ??
     `${connector.binary} ${cmd.path.join(" ")}`;
+  const hinted = applyDescriptionHints(rawDescription);
 
   return defineTool({
     name,
-    description,
+    description: hinted.description,
     connectorName: cmd.connectorName,
     binary: connector.binary,
     argvPrefix: connector.argv_prefix ? [...connector.argv_prefix] : undefined,
@@ -54,11 +60,31 @@ export function toolFromDiscovered(
     skillRefs: [],
     source: "help",
     enabled: true,
+    annotations: hinted.annotations,
+    mcpMeta: hinted.mcpMeta,
+  });
+}
+
+function mergeDiscoveredArgs(
+  fromHelp: DiscoveredArg[],
+  fromUsage: DiscoveredArg[],
+): DiscoveredArg[] {
+  const names = new Set(fromHelp.map((a) => a.name));
+  const extra = fromUsage.filter((a) => !names.has(a.name));
+  return [...fromHelp, ...extra].sort((a, b) => {
+    const ka = a.kind === "positional" ? 0 : 1;
+    const kb = b.kind === "positional" ? 0 : 1;
+    if (ka !== kb) return ka - kb;
+    if (a.kind === "positional" && b.kind === "positional") {
+      return (a.position ?? 0) - (b.position ?? 0);
+    }
+    return 0;
   });
 }
 
 function toToolArg(a: DiscoveredArg): ToolDefinition["args"][number] {
-  const type: ArgType = mapType(a.inferredType);
+  const type: ArgType = mapType(a.inferredType, a.kind);
+  const kind = a.kind;
   return {
     name: a.name,
     type,
@@ -66,10 +92,13 @@ function toToolArg(a: DiscoveredArg): ToolDefinition["args"][number] {
     description: a.description,
     aliases: a.aliases,
     repeatable: a.repeatable,
+    kind,
+    position: a.position,
   };
 }
 
-function mapType(t: DiscoveredArg["inferredType"]): ArgType {
+function mapType(t: DiscoveredArg["inferredType"], kind: DiscoveredArg["kind"]): ArgType {
+  if (kind === "flag") return "boolean";
   switch (t) {
     case "boolean":
       return "boolean";

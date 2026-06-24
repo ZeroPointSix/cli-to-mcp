@@ -6,6 +6,7 @@
  * a tool came from (yaml / template / help / mixed).
  */
 import type { ArgType, OutputFormat } from "../config/schema.js";
+import type { ToolAnnotations, ToolMcpMeta } from "./tool-annotations.js";
 
 /** JSON Schema fragment we feed to MCP. */
 export type JsonSchema = {
@@ -21,6 +22,8 @@ export type JsonSchemaProperty =
 
 export type ToolSource = "yaml" | "template" | "help" | "mixed";
 
+export type ArgKind = "flag" | "option" | "positional";
+
 export type ToolArg = {
   name: string;
   type: ArgType;
@@ -30,6 +33,10 @@ export type ToolArg = {
   enumValues?: string[];
   aliases?: string[];
   repeatable?: boolean;
+  /** How the value is passed on the CLI argv (default: option). */
+  kind?: ArgKind;
+  /** Sort key for positional args (lower = earlier on argv). */
+  position?: number;
 };
 
 export type ToolOutput = { format: OutputFormat };
@@ -54,6 +61,10 @@ export type ToolDefinition = {
   /** Provenance for get_tool_source: which sources contributed and confidence. */
   sources: Array<{ kind: ToolSource; confidence: number }>;
   enabled: boolean;
+  /** MCP tools/list annotations (readOnlyHint, destructiveHint, …). */
+  annotations?: ToolAnnotations;
+  /** Extra MCP tool `_meta` (e.g. cli-to-mcp/identity from help text). */
+  mcpMeta?: ToolMcpMeta;
 };
 
 export type ToolDefinitionInput = Omit<ToolDefinition, "inputSchema" | "sources"> & {

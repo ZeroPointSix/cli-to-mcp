@@ -142,15 +142,34 @@ export class CommandExecutor {
 }
 
 /**
- * Build the full argv: [binary, ...subcommandPath, ...userArgs, ...defaultArgs].
- * User args are emitted as --name value pairs (booleans emit --name only).
- * Repeatable (array) args emit the flag multiple times.
+ * Build the full argv: [binary, ...subcommandPath, positionals, flags/options, ...defaultArgs].
+ * Options emit as --name value; flags as --name only; positionals as bare tokens in order.
  */
 export function buildArgv(tool: ToolDefinition, args: Record<string, unknown>): string[] {
   const argv: string[] = [tool.binary, ...(tool.argvPrefix ?? []), ...tool.command];
-  appendArgs(argv, tool.args, args);
+  const sorted = sortArgsForArgv(tool.args);
+  appendArgs(argv, sorted, args);
   if (tool.defaultArgs) argv.push(...tool.defaultArgs);
   return argv;
+}
+
+export function sortArgsForArgv(decl: ToolDefinition["args"]): ToolDefinition["args"] {
+  const indexed = decl.map((a, i) => ({ a, i }));
+  return indexed
+    .sort((x, y) => {
+      const xp = effectiveArgKind(x.a) === "positional" ? 0 : 1;
+      const yp = effectiveArgKind(y.a) === "positional" ? 0 : 1;
+      if (xp !== yp) return xp - yp;
+      if (xp === 0) return (x.a.position ?? x.i) - (y.a.position ?? y.i);
+      return x.i - y.i;
+    })
+    .map((x) => x.a);
+}
+
+function effectiveArgKind(arg: ToolDefinition["args"][number]): "flag" | "option" | "positional" {
+  if (arg.kind) return arg.kind;
+  if (arg.type === "boolean") return "flag";
+  return "option";
 }
 
 function appendArgs(
@@ -161,8 +180,13 @@ function appendArgs(
   for (const arg of decl) {
     const v = values[arg.name];
     if (v === undefined || v === null) continue;
+    const kind = effectiveArgKind(arg);
+    if (kind === "positional") {
+      appendPositionalValue(argv, arg, v);
+      continue;
+    }
     const flag = flagFor(resolveFlagName(arg));
-    if (arg.type === "boolean") {
+    if (kind === "flag" || arg.type === "boolean") {
       if (v) argv.push(flag);
       continue;
     }
@@ -177,6 +201,22 @@ function appendArgs(
     }
     argv.push(flag, String(v));
   }
+}
+
+function appendPositionalValue(
+  argv: string[],
+  arg: ToolDefinition["args"][number],
+  v: unknown,
+): void {
+  if (arg.type === "array" && Array.isArray(v)) {
+    for (const item of v) argv.push(String(item));
+    return;
+  }
+  if (arg.repeatable && Array.isArray(v)) {
+    for (const item of v) argv.push(String(item));
+    return;
+  }
+  argv.push(String(v));
 }
 
 /** CLI flag name: first alias wins when declared in YAML (e.g. aliases: [j] → -j). */

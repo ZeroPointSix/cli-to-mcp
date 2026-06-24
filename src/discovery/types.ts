@@ -15,6 +15,8 @@ export type DiscoveredArg = {
   inferredType?: "string" | "boolean" | "integer" | "number" | "array";
   enumValues?: string[];
   fromGlobalSection?: boolean;
+  /** Order among positional args (0 = first after subcommand path). */
+  position?: number;
 };
 
 export type DiscoveredCommand = {
