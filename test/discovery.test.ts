@@ -33,6 +33,7 @@ function mkConfig(tools: Record<string, any> = {}): LoadedConfig {
   return {
     config: { version: 1, connectors: [], tools },
     configDir: ".",
+    parserModules: [],
     connectors: [],
     tools,
     configHash: "deadbeef",

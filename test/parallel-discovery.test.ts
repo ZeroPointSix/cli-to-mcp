@@ -38,6 +38,7 @@ describe("parallel connector discovery", () => {
       config: { version: 1 as const, connectors: [], runtime: { parallel_connector_discovery: true } },
       runtime: { parallel_connector_discovery: true },
       configDir: ".",
+      parserModules: [],
       connectors: [mkConn("fast"), mkConn("slow")],
       tools: {},
       configHash: "x",

@@ -5,6 +5,7 @@ import { runHelp } from "./help-runner.js";
 import { HelpParserRegistry } from "./parser-registry.js";
 import { genericPlugin } from "./plugins/generic.js";
 import { cobraPlugin } from "./plugins/cobra.js";
+import { azureCliPlugin } from "./plugins/azure-cli.js";
 import { toolFromDiscovered } from "../builder/tool-from-discovered.js";
 import { scanHelpTree } from "./help-discovery.js";
 import { discoveryFingerprint } from "./help-cache-key.js";
@@ -192,11 +193,12 @@ export class HelpSource {
         return artifacts;
     }
 }
-/** Build the default parser registry with generic + cobra registered. */
+/** Build the default parser registry with built-in help parsers. */
 export function createDefaultParserRegistry() {
     const reg = new HelpParserRegistry();
     reg.register(genericPlugin);
     reg.register(cobraPlugin);
+    reg.register(azureCliPlugin);
     return reg;
 }
 /** Helper for tests: build a template artifact from a partial tool. */

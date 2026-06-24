@@ -4,6 +4,8 @@ export type LoadedConfig = {
     runtime: Config["runtime"];
     /** Absolute directory of the config file, used as base for relative paths. */
     configDir: string;
+    /** Absolute paths to custom parser modules from top-level `parsers:`. */
+    parserModules: string[];
     /** Connectors with relative paths resolved to absolute. */
     connectors: ResolvedConnector[];
     /** Tools keyed by name with relative skill paths resolved. */

@@ -49,6 +49,58 @@ function fakeTool(name: string) {
 }
 
 describe("issue #14 config-only connector fixes", () => {
+  it("loads top-level parsers: before help discovery", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cli-to-mcp-parser-"));
+    const parserPath = join(dir, "shared-parser.mjs");
+    writeFileSync(
+      parserPath,
+      `export const plugin = {
+  id: "shared",
+  displayName: "Shared",
+  match: () => 100,
+  parse(ctx) {
+    return {
+      connectorName: ctx.connectorName,
+      path: ctx.path,
+      rawHelp: ctx.rawHelp,
+      args: [],
+      subcommands: ctx.path.length === 0 ? ["a", "b"] : []
+    };
+  }
+};`,
+    );
+    const logs: string[] = [];
+    const connA = connector({
+      discovery: { mode: "help", parser: "shared", max_depth: 1 },
+    });
+    const connB: ResolvedConnector = {
+      ...connector({ discovery: { mode: "help", parser: "shared", max_depth: 1 } }),
+      name: "other",
+      binary: "other",
+    };
+    const config: LoadedConfig = {
+      config: { version: 1, connectors: [], parsers: [parserPath] },
+      configDir: dir,
+      parserModules: [parserPath],
+      connectors: [connA, connB],
+      tools: {},
+      configHash: "abc",
+    };
+    const { engine, parserRegistry } = await buildDiscoveryEngine(config, {
+      log: (msg) => logs.push(msg),
+      runHelpFn: async () => ({
+        rawHelp: "help",
+        exitCode: 0,
+        source: "stdout" as const,
+        timedOut: false,
+      }),
+    });
+    const tools = await engine.discover(connA, config);
+    expect(parserRegistry.list().map((p) => p.id)).toContain("shared");
+    expect(logs.filter((l) => l.includes("loaded parser module")).length).toBe(1);
+    expect(tools.map((t) => t.name).sort()).toEqual(["az_a", "az_b"]);
+  });
+
   it("loads discovery.parser_module before help discovery", async () => {
     const dir = mkdtempSync(join(tmpdir(), "cli-to-mcp-parser-"));
     const parserPath = join(dir, "az-parser.mjs");
@@ -77,6 +129,7 @@ describe("issue #14 config-only connector fixes", () => {
     const config: LoadedConfig = {
       config: { version: 1, connectors: [] },
       configDir: dir,
+      parserModules: [],
       connectors: [conn],
       tools: {},
       configHash: "abc",

@@ -21,6 +21,7 @@ import { runHelp } from "./help-runner.js";
 import { HelpParserRegistry } from "./parser-registry.js";
 import { genericPlugin } from "./plugins/generic.js";
 import { cobraPlugin } from "./plugins/cobra.js";
+import { azureCliPlugin } from "./plugins/azure-cli.js";
 import { toolFromDiscovered } from "../builder/tool-from-discovered.js";
 import { scanHelpTree } from "./help-discovery.js";
 import type { CacheStore } from "../cache/db.js";
@@ -270,11 +271,12 @@ export class HelpSource implements DiscoverySource {
   }
 }
 
-/** Build the default parser registry with generic + cobra registered. */
+/** Build the default parser registry with built-in help parsers. */
 export function createDefaultParserRegistry(): HelpParserRegistry {
   const reg = new HelpParserRegistry();
   reg.register(genericPlugin);
   reg.register(cobraPlugin);
+  reg.register(azureCliPlugin);
   return reg;
 }
 

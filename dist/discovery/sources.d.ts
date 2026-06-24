@@ -81,7 +81,7 @@ export declare class HelpSource implements DiscoverySource {
     });
     discover(connector: ResolvedConnector, _config: LoadedConfig): Promise<DiscoveryArtifact[]>;
 }
-/** Build the default parser registry with generic + cobra registered. */
+/** Build the default parser registry with built-in help parsers. */
 export declare function createDefaultParserRegistry(): HelpParserRegistry;
 /** Helper for tests: build a template artifact from a partial tool. */
 export declare function makeTemplateArtifact(tool: Omit<ToolDefinition, "inputSchema" | "sources" | "source">, confidence?: number): DiscoveryArtifact;

@@ -1,0 +1,13 @@
+version: 1
+
+parsers:
+  - ./parsers/my-cli.mjs
+
+connectors:
+  - name: demo
+    binary: demo
+    enabled: true
+    discovery:
+      mode: help
+      parser: my-cli
+      max_depth: 2

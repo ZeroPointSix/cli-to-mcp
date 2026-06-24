@@ -35,17 +35,20 @@ export async function buildDiscoveryEngine(config, opts = {}) {
 }
 export async function loadParserModules(config, registry, log = () => { }) {
     const seenModules = new Set();
-    for (const connector of config.connectors) {
-        if (!connector.enabled)
-            continue;
-        const modulePath = connector.discovery?.parser_module;
+    const queue = [
+        ...(config.parserModules ?? []),
+        ...config.connectors
+            .filter((c) => c.enabled && c.discovery?.parser_module)
+            .map((c) => c.discovery.parser_module),
+    ];
+    for (const modulePath of queue) {
         if (!modulePath || seenModules.has(modulePath))
             continue;
         seenModules.add(modulePath);
         const mod = (await import(pathToFileURL(modulePath).href));
         const plugins = parserPluginsFromModule(mod);
         if (plugins.length === 0) {
-            throw new Error(`parser_module did not export a HelpParserPlugin: ${modulePath}`);
+            throw new Error(`parser module did not export a HelpParserPlugin: ${modulePath}`);
         }
         for (const plugin of plugins) {
             if (registry.list().some((p) => p.id === plugin.id)) {

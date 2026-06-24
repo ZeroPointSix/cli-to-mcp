@@ -378,6 +378,12 @@ export declare const RuntimeConfig: z.ZodObject<{
 export type RuntimeConfig = z.infer<typeof RuntimeConfig>;
 export declare const Config: z.ZodObject<{
     version: z.ZodLiteral<1>;
+    /**
+     * Custom help parser modules (`.mjs`/`.js`), loaded once at startup.
+     * Each file must export a HelpParserPlugin as `default`, `plugin`, `parser`,
+     * or `plugins` (array). Connectors reference plugins by `discovery.parser: <id>`.
+     */
+    parsers: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     connectors: z.ZodArray<z.ZodObject<{
         name: z.ZodString;
         binary: z.ZodString;
@@ -667,6 +673,7 @@ export declare const Config: z.ZodObject<{
         skills?: string[] | undefined;
     }[];
     skills?: string[] | undefined;
+    parsers?: string[] | undefined;
     tools?: Record<string, {
         enabled: boolean;
         connector: string;
@@ -726,6 +733,7 @@ export declare const Config: z.ZodObject<{
         skills?: string[] | undefined;
     }[];
     skills?: string[] | undefined;
+    parsers?: string[] | undefined;
     tools?: Record<string, {
         connector: string;
         command: string[];

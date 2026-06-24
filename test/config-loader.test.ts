@@ -201,6 +201,22 @@ connectors:
     expect(loaded.connectors[0].skill_root).toBe(join(dir, "skills"));
   });
 
+  it("resolves top-level parsers relative to config dir", () => {
+    const p = writeConfig(
+      "parsers.yaml",
+      `
+version: 1
+parsers:
+  - ./parsers/my.mjs
+connectors:
+  - name: x
+    binary: x
+`,
+    );
+    const loaded = new ConfigLoader().load(p);
+    expect(loaded.parserModules).toEqual([join(dir, "parsers/my.mjs")]);
+  });
+
   it("resolves parser_module relative to config dir", () => {
     const p = writeConfig(
       "c.yaml",

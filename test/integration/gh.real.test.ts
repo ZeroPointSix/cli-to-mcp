@@ -37,6 +37,7 @@ function mkConfigNoYamlTools(): LoadedConfig {
   return {
     config: { version: 1, connectors: [], tools: {} },
     configDir: ".",
+    parserModules: [],
     connectors: [],
     tools: {},
     configHash: "integration",

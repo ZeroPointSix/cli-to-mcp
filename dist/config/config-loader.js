@@ -35,10 +35,12 @@ export class ConfigLoader {
                 skills: (decl.skills ?? []).map((s) => resolve(configDir, s)),
             };
         }
+        const parserModules = (config.parsers ?? []).map((p) => resolve(configDir, p));
         return {
             config,
             runtime: config.runtime,
             configDir,
+            parserModules,
             connectors,
             tools,
             configHash: hashString(raw),

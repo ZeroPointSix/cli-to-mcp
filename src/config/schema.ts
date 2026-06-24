@@ -114,6 +114,12 @@ export type RuntimeConfig = z.infer<typeof RuntimeConfig>;
 
 export const Config = z.object({
   version: z.literal(1),
+  /**
+   * Custom help parser modules (`.mjs`/`.js`), loaded once at startup.
+   * Each file must export a HelpParserPlugin as `default`, `plugin`, `parser`,
+   * or `plugins` (array). Connectors reference plugins by `discovery.parser: <id>`.
+   */
+  parsers: z.array(z.string().min(1)).optional(),
   connectors: z.array(ConnectorConfig),
   tools: z.record(z.string(), ToolDecl).optional(),
   skills: z.array(z.string()).optional(),
